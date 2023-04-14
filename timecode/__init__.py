@@ -211,7 +211,7 @@ class Timecode(object):
         if isinstance(timecode, Timecode):
             return timecode.frames
 
-        hours, minutes, seconds, frames = map(int, self.parse_timecode(timecode))
+        hours, minutes, seconds, frames = map(int, Timecode.parse_timecode(timecode))
 
         if isinstance(timecode, int):
             time_tokens = [hours, minutes, seconds, frames]
