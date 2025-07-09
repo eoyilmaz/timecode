@@ -892,7 +892,11 @@ class Timecode:
         Returns:
             float: The seconds as float.
         """
-        return float(self.frames) / float(self._int_framerate)
+        time_value = float(self.frames) / float(self._int_framerate)
+        # Add a very small epsilon - just enough to ensure we're above the truncation point
+        # but not so much that we'd jump to the next frame
+        epsilon = 1e-10  # This is much smaller than 1/framerate for any reasonable framerate
+        return time_value + epsilon
 
 
 class TimecodeError(Exception):
