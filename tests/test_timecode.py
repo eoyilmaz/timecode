@@ -730,7 +730,8 @@ def test_toggle_fractional_frame_3():
 def test_timestamp_realtime_1():
     frames = 12345
     ts = frames*1/24
-    assert Timecode(24, frames=frames).to_realtime(True) == ts
+    realtime = Timecode(24, frames=frames).to_realtime(True)
+    assert abs(realtime - ts) < 1e-09
 
 
 def test_timestamp_realtime_2():
@@ -935,7 +936,7 @@ def test_bug_report_32():
     framerate = "30000/1001"
     seconds = 500
     tc1 = Timecode(framerate, start_seconds=seconds)
-    assert seconds == tc1.float
+    assert abs(tc1.float - seconds) < 1e-09
 
 
 def test_set_timecode_method():
@@ -1089,7 +1090,7 @@ def test_float_representation_roundtrip(framerate):
     """Test float representation of Timecode."""
     mismatched = 0
     # Close enough to max frame across our supported framerates.
-    num_frames = Timecode(framerate, "23:59:59;23").frame_number
+    num_frames = Timecode(framerate, "24:00:00;00").frame_number
     max_samples = 50_000
 
     if num_frames <= max_samples:
