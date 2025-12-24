@@ -1,9 +1,10 @@
 About
 -----
 
-Python module for manipulating SMPTE timecode. Supports any arbitrary integer frame
-rates and some default str values of 23.976, 23.98, 24, 25, 29.97, 30, 50, 59.94, 60
-frame rates and milliseconds (1000 fps) and fractional frame rates like "30001/1001".
+Python module for manipulating SMPTE timecode. Supports all formats in the ST12 standard, 
+as well as any arbitrary integer frame rates and some default str values of 23.976, 23.98, 
+24, 25, 29.97, 30, 50, 59.94, 60 frame rates and milliseconds (1000 fps) and fractional 
+frame rates like "30000/1001".
 
 This library is a fork of the original PyTimeCode python library. You should  not use
 the two library together (PyTimeCode is not maintained and has known bugs).
@@ -47,7 +48,7 @@ assert tc4.frame_number == 0
 > exist there should be a frame. and 00:00:00:00 is generally the label given to the
 > first frame.
 
-Frame rates 29.97 and 59.94 are always drop frame, and all the others are non drop
+Frame rates 29.97, 59.94 and 119.88 are always drop frame, and all the others are non drop
 frame.
 
 The timecode library supports fractional frame rates passed as a string:
