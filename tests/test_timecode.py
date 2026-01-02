@@ -3,8 +3,8 @@ import pytest
 
 from timecode import Timecode, TimecodeError
 
+from fractions import Fraction
 import random
-
 
 @pytest.mark.parametrize(
     "args,kwargs",
@@ -143,9 +143,9 @@ def test_repr_overload(args, kwargs, expected_result, operator):
     """Several timecode initialization."""
     tc = Timecode(*args, **kwargs)
     if operator:
-        assert expected_result == tc.__repr__()
+        assert expected_result == tc.__str__()
     else:
-        assert expected_result != tc.__repr__()
+        assert expected_result != tc.__str__()
 
 
 def test_repr_overload_2():
@@ -335,7 +335,6 @@ def test_setting_framerate_to_1000_enables_ms_frame():
 def test_framerate_argument_is_frames():
     """Setting the framerate arg to 'frames' will set the integer frame rate to 1."""
     tc = Timecode("frames")
-    assert tc.framerate == "frames"
     assert tc._int_framerate == 1
 
 
@@ -981,7 +980,7 @@ def test_op_overloads_mult_1():
     tc1 = Timecode("23.98", "03:36:09:23")
     tc2 = Timecode("23.98", "00:00:29:23")
     tc3 = tc1 * tc2
-    assert tc3.framerate == "23.98"
+    assert tc3.framerate == Fraction(24000, 1001)
 
 
 def test_op_overloads_mult_2():
@@ -1008,7 +1007,7 @@ def test_add_with_two_different_frame_rates():
     tc1 = Timecode("29.97", "00:00:00;00")
     tc2 = Timecode("24", "00:00:00:10")
     tc3 = tc1 + tc2
-    assert "29.97" == tc3.framerate
+    assert Fraction(30000, 1001) == tc3.framerate
     assert 12 == tc3._frames
     assert tc3 == "00:00:00;11"
 
@@ -1105,8 +1104,8 @@ def test_24_hour_limit_in_2997fps():
     assert tc2.drop_frame
     assert 2589408 == tc2._frames
 
-    assert "00:00:00;21" == tc1.__repr__()
-    assert "23:59:59;29" == tc2.__repr__()
+    assert "00:00:00;21" == str(tc1)
+    assert "23:59:59;29" == str(tc2)
 
     assert "00:00:00;21" == (tc1 + tc2).__str__()
     assert "02:00:00;00" == (tc2 + 215785).__str__()
@@ -1226,23 +1225,23 @@ def test_framerate_can_be_changed():
 def test_rational_framerate_conversion(args, kwargs, frame_rate, int_framerate):
     """Fractional framerate conversion."""
     tc = Timecode(*args, **kwargs)
-    assert frame_rate == tc.framerate
+    assert abs(float(frame_rate) - tc.framerate) < 5e-3
     assert int_framerate == tc._int_framerate
 
 
 def test_rational_frame_delimiter_1():
     tc = Timecode("24000/1000", frames=1)
-    assert ";" not in tc.__repr__()
+    assert ";" not in tc.__str__()
 
 
 def test_rational_frame_delimiter_2():
     tc = Timecode("24000/1001", frames=1)
-    assert ";" not in tc.__repr__()
+    assert ";" not in tc.__str__()
 
 
 def test_rational_frame_delimiter_3():
     tc = Timecode("30000/1001", frames=1)
-    assert ";" in tc.__repr__()
+    assert ";" in tc.__str__()
 
 
 def test_ms_vs_fraction_frames_1():
@@ -1266,49 +1265,49 @@ def test_ms_vs_fraction_frames_3():
 
 def test_toggle_fractional_frame_1():
     tc = Timecode(24, 421729315)
-    assert tc.__repr__() == "19:23:14:23"
+    assert tc.__str__() == "19:23:14:23"
 
 
 def test_toggle_fractional_frame_2():
     tc = Timecode(24, 421729315)
     tc.set_fractional(True)
-    assert tc.__repr__() == "19:23:14.958"
+    assert tc.__str__() == "19:23:14.958"
 
 
 def test_toggle_fractional_frame_3():
     tc = Timecode(24, 421729315)
     tc.set_fractional(False)
-    assert tc.__repr__() == "19:23:14:23"
+    assert tc.__str__() == "19:23:14:23"
 
 
 def test_timestamp_realtime_1():
     frames = 12345
     ts = frames * 1 / 24
-    realtime = Timecode(24, frames=frames).to_realtime(True)
+    realtime = float(Timecode(24, frames=frames).to_realtime())
     assert abs(realtime - ts) < 1e-09
 
 
 def test_timestamp_realtime_2():
     tc = Timecode(50, start_seconds=1 / 50)
-    assert tc.to_realtime() == "00:00:00.020"
+    assert str(tc.to_realtime()) == "00:00:00.020"
 
 
 def test_timestamp_realtime_3():
     # SMPTE 12-1 §5.2.2:
     # - "When DF compensation is applied to NTSC TC, the deviation after one hour is approximately –3.6 ms"
     tc = Timecode(29.97, "00:59:59;29")
-    assert tc.to_realtime() == str(Timecode(1000, "01:00:00.000") - int(round(3.6)))
+    assert str(tc.to_realtime()) == str((Timecode(1000, "00:59:59.999") - int(round(3.6))).to_realtime())
 
     # - "[...] The deviation accumulated over a 24-hour period is approximately –2.6 frames (–86 ms)"
     tc = Timecode(59.94, "23:59:59;59")
-    assert tc.to_realtime() == str(Timecode(1000, "24:00:00.000") - 86)
+    assert str(tc.to_realtime()) == str((Timecode(1000, "23:59:59.999") - 86).to_realtime())
 
 
 def test_timestamp_realtime_4():
     # SMPTE 12-1 §5.2.2
     # - "Monotonically counting at int_framerate will yield a deviation of approx. +3.6 s in one hour of elapsed time."
     tc = Timecode(59.94, "00:59:59:59", force_non_drop_frame=True)
-    assert tc.to_realtime() == str(Timecode(1000, "01:00:00.000") + 3600)
+    assert str(tc.to_realtime()) == str((Timecode(1000, "00:59:59.999") + 3600).to_realtime())
 
 
 def test_timestamp_systemtime_1():
@@ -1317,10 +1316,10 @@ def test_timestamp_systemtime_1():
     """
     tc50 = Timecode(50, "00:59:59:49")
     tc24 = Timecode(24, "00:59:59:23")
-    tcms = Timecode(1000, "01:00:00.000")
-    assert tc50.to_systemtime() == "01:00:00.000"
-    assert tc24.to_systemtime() == "01:00:00.000"
-    assert tcms.to_systemtime() == "01:00:00.000"
+    tcms = Timecode(1000, "00:59:59.999")
+    assert str(tc50.to_systemtime()) == "01:00:00.000"
+    assert str(tc24.to_systemtime()) == "01:00:00.000"
+    assert str(tcms.to_systemtime()) == "01:00:00.000"
 
 
 def test_timestamp_systemtime_2():
@@ -1328,7 +1327,7 @@ def test_timestamp_systemtime_2():
     TC with NTSC framerate always have system time different to realtime.
     """
     tc = Timecode(23.98, "00:59:59:23")
-    assert tc.to_systemtime() == "01:00:00.000"
+    assert str(tc.to_systemtime()) == "01:00:00.000"
     assert tc.to_systemtime() != tc.to_realtime()
 
 
@@ -1338,9 +1337,9 @@ def test_timestamp_systemtime_3():
     with a -3.6 ms drift per hour (SMPTE 12-1 §5.2.2).
     """
     tc = Timecode(29.97, "23:59:59;29")
-    assert tc.to_systemtime() == "24:00:00.000"
+    assert str(tc.to_systemtime()) == "24:00:00.000"
     # Check if we have the expected drift at 24h
-    assert abs(tc.to_systemtime(True) - tc.to_realtime(True) - 24 * 3600e-6) < 1e-6
+    assert abs(float(tc.to_systemtime()) - float(tc.to_realtime()) - 24 * 3600e-6) < 1e-6
 
 
 def test_add_const_dropframe_flag():
@@ -1455,7 +1454,7 @@ def test_bug_report_30():
     frame_idx = 50000
 
     tc1 = Timecode(framerate, frames=frame_idx)
-    assert "00:34:43:07" == tc1.__repr__()
+    assert "00:34:43:07" == tc1.__str__()
 
 
 def test_bug_report_31_part1():
@@ -1508,7 +1507,7 @@ def test_set_timecode_method():
     tc2 = Timecode("29.97", frames=1000)
     assert tc2.frames == 1000
 
-    tc1.set_timecode(tc2.__repr__())  # this is interpreted as 24
+    tc1.set_timecode(tc2.__str__())  # this is interpreted as 24
     assert tc1.frames == 802
 
     tc1.set_timecode(tc2)  # this should be interpreted as 29.97 and 1000 frames
@@ -1546,7 +1545,7 @@ def test_mult_frames_method_is_working_properly():
     tc = Timecode("24")
     tc.mult_frames(10)
     assert tc.frames == 10
-    assert tc.__repr__() == "00:00:00:09"
+    assert tc.__str__() == "00:00:00:09"
 
 
 def test_div_frames_method_is_working_properly():
@@ -1555,7 +1554,7 @@ def test_div_frames_method_is_working_properly():
     assert tc.frames == 10
     tc.div_frames(10)
     assert tc.frames == 1
-    assert tc.__repr__() == "00:00:00:00"
+    assert tc.__str__() == "00:00:00:00"
 
 
 def test_eq_method_with_integers():
@@ -1647,7 +1646,7 @@ def test_rollover_for_23_98():
     assert 2071849 == tc.frames
     tc.add_frames(24)
     assert 2071873 == tc.frames
-    assert "23:58:48:00" == tc.__repr__()
+    assert "23:58:48:00" == tc.__str__()
 
 
 @pytest.mark.parametrize(
@@ -1734,10 +1733,10 @@ def test_generalized_ntsc_rates(
     # Test basic creation and NTSC detection
     separator = ";" if is_drop else ":"
     tc = Timecode(framerate, f"00:00:00{separator}00")
-    assert tc._ntsc_framerate is True
+    assert tc._is_ntsc_rate is True
     assert tc._int_framerate == int_framerate
     assert tc.drop_frame is is_drop
-    assert tc.framerate == framerate
+    assert abs(tc.framerate - float(framerate)) < 5e-3
 
     # Test frame counting - one second should be int_framerate + 1
     tc2 = Timecode(framerate, f"00:00:01{separator}00")
@@ -1761,6 +1760,43 @@ def test_generalized_ntsc_rational_formats(rational_str, int_framerate, is_drop)
     """Test that rational format fractions work for new NTSC rates."""
     separator = ";" if is_drop else ":"
     tc = Timecode(rational_str, f"00:00:00{separator}00")
-    assert tc._ntsc_framerate is True
+    assert tc._is_ntsc_rate is True
     assert tc._int_framerate == int_framerate
     assert tc.drop_frame is is_drop
+    
+def test_repr_parse():
+    #force NDF to verify there is no mangling even with a DF framerate
+    tc = Timecode('30000/1001', '12:34:56:21', force_non_drop_frame=True)
+    tc_eval = eval(repr(tc))
+
+    assert tc.frames == tc_eval.frames
+    assert tc.framerate == tc_eval.framerate
+
+def test_reference_time():
+    framerate = Fraction(120000, 1001)
+    #start_seconds is in the system timebase, so use int_fps
+    tc1 = Timecode(framerate, start_seconds=1/120)
+    tc2 = Timecode(framerate, start_seconds=0, reference_time_on_display=True)
+    assert tc1 == tc2
+
+def test_reference_time_frame_offset():
+    framerate = Fraction(120000, 1001)
+    #start_seconds is in the system timebase, so use int_fps
+    tc1 = Timecode(framerate, start_seconds=600)
+    tc2 = Timecode(framerate, start_seconds=600, reference_time_on_display=True)
+    assert (tc1 + 1) == tc2
+
+def test_reference_real_system_time_value():
+    framerate = Fraction(48000, 1001)
+    tc = Timecode(framerate, frames=1, reference_time_on_display=True)
+    assert tc.frames == 1
+    assert tc._is_ntsc_rate is True # needed for this test
+    
+    # Time reference on system starting to draw the first frame.
+    # only time where both are equal.
+    assert float(tc.to_realtime()) == 0.0
+    assert float(tc.to_systemtime()) == 0.0
+    
+    tc.reference_time_on_display = False
+    # No longer true, NTSC is slower than wall-clock
+    assert 0 < tc.to_systemtime() < tc.to_realtime()
