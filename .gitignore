@@ -1,8 +1,10 @@
+__pycache__
 .coverage
 .DS_Store
 .pytest_cache/*
 .ruff_cache/*
 .venv/*
+.vscode/*
 *.egg-info
 *.egg-info/*
 *.pyc
@@ -15,4 +17,3 @@ docs/html/*
 docs/latex/*
 docs/source/generated/*
 include/*
-__pycache__

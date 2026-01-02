@@ -3,59 +3,180 @@
 # Standard Library Imports
 from __future__ import annotations
 
+import math
 import sys
-from contextlib import suppress
-from typing import TYPE_CHECKING, overload
+from fractions import Fraction
+from typing import TYPE_CHECKING, NewType
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 if sys.version_info >= (3, 11):
     from typing import Self
 else:
     from typing_extensions import Self
 
-with suppress(ImportError):
-    from typing import Literal
+_Framerate = NewType("_Framerate", Fraction | str | float | tuple[int, int])
 
+#%%
+class _Timestamp:
+    def __init__(self, ts: Fraction, usec_precision: bool = False) -> None:
+        if ts < 0:
+            raise ValueError(f"Timestamp cannot be negative, got {ts}.")
+        self.usec_precision = usec_precision
+        self._exact_ts = ts
+        
+    def __float__(self) -> float:
+        """Convert this _Timestamp instance to a float (timestamp in seconds).
+        
+        Returns:
+            float: timestamp value in seconds of this instance
+        """
+        return float(self._exact_ts)    
+    
+    def total_seconds(self) -> float:
+        """Return the time in seconds of this Timestamp instance as a float.
+        
+        Returns:
+            float: timestamp value in seconds of this instance
+            
+        Truncation is possible, it's not an exact representation.
+        """
+        return float(self)
+    
+    def exact(self) -> Fraction:
+        """Return the time in seconds of this Timestamp instance as a fraction.
+        
+        Returns:
+            Fraction: exact timestamp value in seconds of this instance.
+        """
+        return self._exact_ts
+    
+    def __str__(self) -> str:
+        """Convert the _Timestamp instance to a timestamp string.
+        
+        Returns:
+            string: Timestamp string of this _Timestamp instance.
+        """
+        hh = int(self._exact_ts // 3600)
+        mm = int(self._exact_ts // 60) % 60
+        ss = int(self._exact_ts % 60)
+        decimal_part = (self._exact_ts - int(self._exact_ts))*1000
+        
+        if self.usec_precision:
+            s_decimal_part = f"{round(decimal_part*1000):>06}"
+        else:
+            s_decimal_part = f"{round(decimal_part):03}"
+        return f"{hh:02d}:{mm:02d}:{ss:02d}.{s_decimal_part}"
 
-if TYPE_CHECKING:
-    from collections.abc import Iterator
-    from fractions import Fraction
+    def __repr__(self) -> str:
+        """Represent a _Timestamp instance.
+        
+        Returns:
+            string: representation of this _Timestamp instance.
+        """
+        usec_part = f", usec_precision={self.usec_precision}" * self.usec_precision
+        return f"{__class__.__name__}({self._exact_ts}{usec_part})"
+####
 
-
+#%%
 class Timecode:
     """The main timecode class.
 
     Does all the calculation over frames, so the main data it holds is frames,
     then when required it converts the frames to a timecode by using the frame
     rate setting.
-
+    
     Args:
-        framerate (str | int | float | Fraction): The frame rate of the
+        framerate (Fraction | str | int | float): The frame rate of the
             Timecode instance. If a str is given it should be one of ['23.976',
             '23.98', '24', '25', '29.97', '30', '50', '59.94', '60',
-            'NUMERATOR/DENOMINATOR', ms'] where "ms" equals to 1000 fps.
+            'NUMERATOR/DENOMINATOR', 'ms'] where "ms" equals to 1000 fps.
             Otherwise, any integer or Fractional value is accepted. Can not be
             skipped. Setting the framerate will automatically set the
             :attr:`.drop_frame` attribute to correct value.
-        start_timecode (None | str): The start timecode. Use this to be able to
-            set the timecode of this Timecode instance. It can be skipped and
-            then the frames attribute will define the timecode, and if it is
-            also skipped then the start_second attribute will define the start
-            timecode, and if start_seconds is also skipped then the default
-            value of '00:00:00:00' will be used. When using 'ms' frame rate,
-            timecodes like '00:11:01.040' use '.040' as frame number. When used
-            with other frame rates, '.040' represents a fraction of a second.
-            So '00:00:00.040' at 25fps is 1 frame.
+        start_timecode (None | str | Timecode): The start timecode. Use this to
+            be able to set the timecode of this Timecode instance. It can be
+            skipped and then the frames attribute will define the timecode, and
+            if it is also skipped then the start_second attribute will define
+            the start timecode, and if start_seconds is also skipped then the
+            default value of '00:00:00:00' will be used. When using 'ms' frame
+            rate, timecodes like '00:11:01.040' use '.040' as frame number.
+            When used with other frame rates, '.040' represents a fraction of a
+            second. So '00:00:00.040' at 25fps is 1 frame.
         start_seconds (int | float): A float or integer value showing the
             seconds.
         frames (int): Timecode objects can be initialized with an integer
             number showing the total frames.
         force_non_drop_frame (bool): If True, uses Non-Dropframe calculation
-            for 29.97 or 59.94 only. Has no meaning for any other framerate. It
-            is False by default.
+            for NTSC-rate multiples of 29.97 (59.94, 119.88) only. Has no
+            meaning for any other framerate. It is False by default.
+        reference_time_on_display (bool): If True, specify the raster scan time
+            reference to the top of the display rather than the bottom.
+            True: The 1st frame wall-clock time is 0.0 sec.
+            False (default): The 1st frame wall-clock time is 1/fps sec: the
+            drawing duration of the 1st frame is included.
+            This parameter affects the reference for start_seconds.
     """
+    def __init__(
+        self,
+        framerate: _Framerate,
+        start_timecode: str | Self | None = None,
+        start_seconds: None | float = None,
+        frames: int | None = None,
+        force_non_drop_frame: bool = False,
+        reference_time_on_display: bool = False,
+    ) -> None:
+        self.fraction_frame = False
+        self.usec_timestamps = False
+        self.drop_frame = False
+
+        self.framerate = framerate
+        
+        # Do not set drop_frame to true in the framerate setter: the user
+        # could be switching NTSC rates with force_non_drop_frame=True
+        # clearing drop_frame every time would be an annoyance.
+        if not force_non_drop_frame and (self._int_framerate % 30) == 0:
+            self.drop_frame = self._is_ntsc_rate
+        
+        # if true, the first frame display at t=0 sec and not t=1/fps
+        # this impacts start_seconds and the time getters.
+        self.reference_time_on_display = reference_time_on_display
+        
+        self._dispatch_set_frames(start_timecode=start_timecode,
+                                  start_seconds=start_seconds,
+                                  frames=frames)
+        # set a default
+        if getattr(self, "_frames", None) is None:
+            self.frames = self.tc_to_frames("00:00:00:00")
+            
+    ####
+        
+    def _dispatch_set_frames(self, **kwargs) -> None:
+        """Helper to dispatch the arguments to set the Timecode frames count.
+        
+        Args:
+            kwargs (dict): dictionary of possible input values to set the frame
+            count. The following order of priority applies:
+                1. start_timecode: Timecode string, or Timecode object.
+                2. frames: frames count of the Timecode.
+                3. start_seconds: float or fraction in seconds.
+        """
+        if (start_timecode := kwargs.get("start_timecode")) is not None:
+            self.frames = self.tc_to_frames(start_timecode)
+        elif (frames := kwargs.get("frames")) is not None:
+            self.frames = frames
+        elif (start_seconds := kwargs.get("start_seconds")) is not None:
+            if self.reference_time_on_display:
+                start_seconds += Fraction(1, self._int_framerate)
+
+            if start_seconds <= 0:
+                raise ValueError("``start_seconds`` argument can not be 0")
+            self.frames = self.seconds_to_tc(start_seconds)
+    #### 
 
     @staticmethod
-    def _is_ntsc_rate(fps: float) -> tuple[bool, int]:
+    def _check_ntsc_rate(fps: Fraction) -> tuple[bool, int]:
         """Check if framerate is NTSC (multiple of 24000/1001 or 30000/1001).
 
         NTSC rates follow the pattern: nominal_rate * 1000/1001
@@ -79,38 +200,82 @@ class Timecode:
 
         return is_ntsc, int_fps
 
-    def __init__(
-        self,
-        framerate: str | float | Fraction,
-        start_timecode: None | str = None,
-        start_seconds: None | float = None,
-        frames: None | int = None,
-        force_non_drop_frame: bool = False,
-    ) -> None:
-        self.force_non_drop_frame = force_non_drop_frame
+    @property
+    def framerate(self) -> Fraction:
+        """Framerate getter.
 
-        self.drop_frame = False
+        Returns:
+            Fraction: The Timecode framerate, as a fraction of two integers.
+        """
+        return self._framerate
 
-        self.ms_frame = False
-        self.fraction_frame = False
-        self._int_framerate: None | int = None
-        self._framerate: None | str | int | float | Fraction = None
-        self.framerate = framerate  # type: ignore
-        self._frames: None | int = None
+    @framerate.setter
+    def framerate(self, new_framerate: _Framerate) -> None:
+        """Set a framerate to the Timecode instance.
 
-        # attribute override order
-        # start_timecode > frames > start_seconds
-        if start_timecode:
-            self.frames = self.tc_to_frames(start_timecode)
-        elif frames is not None:
-            self.frames = frames
-        elif start_seconds is not None:
-            if start_seconds == 0:
-                raise ValueError("``start_seconds`` argument can not be 0")
-            self.frames = self.float_to_tc(start_seconds)
+        Args:
+            new_framerate (_Framerate): The framerate to use
+
+        The provided rate is converted to a fraction. Special values "ms" and
+        "frames" are accepted to specify 1/1000 or 1/1 (resp.)
+
+        """
+        if isinstance(new_framerate, str):
+            if new_framerate == "ms":
+                new_framerate = 1000
+            elif new_framerate == "frames":
+                new_framerate = 1
+        
+        if isinstance(new_framerate, (tuple, list)):
+            new_framerate = tuple(map(int, new_framerate))
+            new_fps = Fraction(*new_framerate)
         else:
-            # use default value of 00:00:00:00
-            self.frames = self.tc_to_frames("00:00:00:00")
+            new_fps = Fraction(new_framerate)
+        if new_fps.numerator <= 0:
+            raise ValueError("Invalid framerate (zero or negative).")
+        
+        self.ms_frame = (new_fps == 1000)
+        if not self.ms_frame:
+            self._is_ntsc_rate, self._int_framerate = \
+                __class__._check_ntsc_rate(new_fps)
+        else:
+            self._is_ntsc_rate, self._int_framerate = False, int(new_fps)
+
+        # Fix ambiguous values like 23976/1000 or 23.98.
+        if self._is_ntsc_rate and new_fps.denominator != 1001:
+            new_fps = Fraction(self._int_framerate * 1000, 1001)
+
+        # No more a NTSC framerate. Only clear as the TC could be forced to NDF
+        if self.drop_frame and \
+            (not self._is_ntsc_rate or (self._int_framerate % 30) > 0):
+            self.drop_frame = False
+        self._framerate = new_fps
+
+    def to_systemtime(self) -> _Timestamp:
+        """Convert a Timecode to the video system timestamp.
+
+        For NTSC rates, the video system time is not the wall-clock one.
+
+        Returns:
+            _Timestamp of the "system time" of the Timecode.
+        """
+        display_delay = int(not self.reference_time_on_display)
+        hh, mm, ss, ff = self.frames_to_tc(self.frames, skip_rollover=True)
+        ts = ss + 60 * (mm + 60 * hh)
+        ts += Fraction((ff + display_delay), self._int_framerate)
+        return _Timestamp(ts, usec_precision=self.usec_timestamps)
+
+    def to_realtime(self) -> _Timestamp:
+        """Convert a Timecode to the wall-clock (real time) timestamp.
+
+        For NTSC rates, the real time value differs from the system time.
+
+        Returns:
+            _Timestamp of the "real time" of the Timecode.
+        """
+        ts = Fraction(self.frames, self.framerate)
+        ts -= Fraction(int(self.reference_time_on_display), self.framerate)
+        return _Timestamp(ts, usec_precision=self.usec_timestamps)
 
     @property
     def frames(self) -> int:
@@ -142,97 +307,7 @@ class Timecode:
                 f"integer bigger than zero, not {frames}"
             )
         self._frames = frames
-
-    @property
-    def framerate(self) -> str:
-        """Return the _framerate attribute.
-
-        Returns:
-            str: The frame rate of this Timecode instance.
-        """
-        return self._framerate  # type: ignore
-
-    @framerate.setter
-    def framerate(self, framerate: float | str | tuple[int, int] | Fraction) -> None:
-        """Set the framerate attribute.
-
-        Args:
-            framerate (int | float | str | tuple[int, int] | Fraction): Several
-                different type is accepted for this argument:
-
-                int, float: It is directly used.
-                str: Is used for setting DF Timecodes and possible values are
-                    ["23.976", "23.98", "29.97", "59.94", "ms", "1000", "frames"] where
-                    "ms" and "1000" results in to a milliseconds based Timecode and
-                    "frames" will result a Timecode with 1 FPS.
-                tuple: The tuple should be in (nominator, denominator) format in which
-                    the frame rate is kept as a fraction.
-                Fraction: If the current version of Python supports (which it should)
-                    then Fraction is also accepted.
-        """
-        # Convert rational frame rate to float, defaults to None if not Fraction-like
-        numerator = getattr(framerate, "numerator", None)
-        denominator = getattr(framerate, "denominator", None)
-
-        try:
-            if "/" in framerate:  # type: ignore
-                numerator, denominator = framerate.split("/")  # type: ignore
-        except TypeError:
-            # not a string
-            pass
-
-        if isinstance(framerate, tuple):
-            numerator, denominator = framerate
-
-        if numerator and denominator:
-            framerate = round(float(numerator) / float(denominator), 2)
-            if framerate.is_integer():
-                framerate = int(framerate)
-
-        # check if number is passed and if so convert it to a string
-        if isinstance(framerate, (int, float)):
-            framerate = str(framerate)
-
-        self._ntsc_framerate = False
-
-        # Handle special cases first
-        if framerate in ["ms", "1000"]:
-            self._int_framerate = 1000
-            self.ms_frame = True
-            framerate = 1000
-        elif framerate == "frames":
-            self._int_framerate = 1
-        else:
-            # Try to detect NTSC rates
-            try:
-                fps = float(framerate)  # type: ignore
-                is_ntsc, int_fps = self._is_ntsc_rate(fps)
-
-                if is_ntsc:
-                    self._ntsc_framerate = True
-                    self._int_framerate = int_fps
-                    # DF only for multiples of 30000/1001 (29.97, 59.94, etc.).
-                    if int_fps % 30 == 0:
-                        self.drop_frame = not self.force_non_drop_frame
-                else:
-                    # Non-NTSC rate, use integer value
-                    self._int_framerate = int(fps)
-            except (ValueError, TypeError):
-                # If conversion fails, fall back to direct integer conversion
-                self._int_framerate = int(float(framerate))  # type: ignore
-
-        self._framerate = framerate  # type: ignore
-
-    def set_fractional(self, state: bool) -> None:
-        """Set if the Timecode is to be represented with fractional seconds.
-
-        Args:
-            state (bool): If set to True the current Timecode instance will be
-                represented with a fractional seconds (will have a "." in the frame
-                separator).
-        """
-        self.fraction_frame = state
-
+        
     def set_timecode(self, timecode: str | Timecode) -> None:
         """Set the frames by using the given timecode.
 
@@ -242,7 +317,7 @@ class Timecode:
         """
         self.frames = self.tc_to_frames(timecode)
 
-    def float_to_tc(self, seconds: float) -> int:
+    def seconds_to_tc(self, seconds: float | Fraction) -> int:
         """Return the number of frames in the given seconds using the current instance.
 
         Args:
@@ -250,7 +325,7 @@ class Timecode:
                 frame rate for proper calculation.
 
         Returns:
-            int: The number of frames in the given seconds.ß
+            int: The number of frames in the given seconds.
         """
         return int(seconds * self._int_framerate)
 
@@ -277,14 +352,8 @@ class Timecode:
             if self.drop_frame:
                 timecode = ";".join(timecode.rsplit(":", 1))
 
-        ffps = (
-            float(self.framerate)
-            if self.framerate != "frames"
-            else float(self._int_framerate)
-        )
-
         # Number of drop frames is 6% of framerate rounded to nearest integer
-        drop_frames = round(ffps * 0.066666) if self.drop_frame else 0
+        drop_frames = round(self.framerate * 0.066666) if self.drop_frame else 0
 
         # We don't need the exact framerate anymore, we just need it rounded to
         # nearest integer
@@ -304,7 +373,7 @@ class Timecode:
             self.fraction_frame = True
             fraction = timecode.rsplit(".", 1)[1]
 
-            frames = round(float("." + fraction) * ffps)
+            frames = round(float("." + fraction) * float(self.framerate))
 
         frame_number = (
             (hour_frames * hours)
@@ -331,10 +400,10 @@ class Timecode:
         if self.drop_frame:
             # Number of frames to drop on the minute marks is the nearest
             # integer to 6% of the framerate
-            ffps = float(self.framerate)
+            ffps = round(self.framerate, 2)
             drop_frames = round(ffps * 0.066666)
         else:
-            ffps = float(self._int_framerate)
+            ffps = self._int_framerate
             drop_frames = 0
 
         # Number of frames per ten minutes
@@ -345,7 +414,7 @@ class Timecode:
 
         # Number of frames per minute is the round of the framerate * 60 minus
         # the number of dropped frames
-        frames_per_minute = int(round(ffps) * 60) - drop_frames
+        frames_per_minute = int(self._int_framerate * 60) - drop_frames
 
         frame_number = frames - 1
 
@@ -368,14 +437,13 @@ class Timecode:
 
         frs: int | float = frame_number % ifps
         if self.fraction_frame:
-            frs = round(frs / float(ifps), 3)
+            frs = round(frs / ifps, 3)
 
         secs = int((frame_number // ifps) % 60)
         mins = int(((frame_number // ifps) // 60) % 60)
         hrs = int(((frame_number // ifps) // 60) // 60)
 
         return hrs, mins, secs, frs
-
     def tc_to_string(self, hrs: int, mins: int, secs: int, frs: float) -> str:
         """Return the string representation of a Timecode with given info.
 
@@ -386,7 +454,7 @@ class Timecode:
             frs (int | float): The frames portion of the Timecode.
 
         Returns:
-            str: The string representation of this Timecode.ßß
+            str: The string representation of this Timecode.
         """
         if self.fraction_frame:
             return f"{hrs:02d}:{mins:02d}:{secs + frs:06.3f}"
@@ -398,86 +466,6 @@ class Timecode:
         return ("{:02d}:{:02d}:{:02d}{}" + ff).format(
             hrs, mins, secs, self.frame_delimiter, frs
         )
-
-    @overload
-    def to_systemtime(self, as_float: Literal[True]) -> float:
-        pass
-
-    @overload
-    def to_systemtime(self, as_float: Literal[False]) -> str:
-        pass
-
-    def to_systemtime(self, as_float: bool = False) -> str | float:  # type:ignore
-        """Convert a Timecode to the video system timestamp.
-
-        For NTSC rates, the video system time is not the wall-clock one.
-
-        Args:
-            as_float (bool): Return the time as a float number of seconds.
-
-        Returns:
-            str: The "system time" timestamp of the Timecode.
-        """
-        if self.ms_frame:
-            return self.float - (1e-3) if as_float else str(self)
-
-        hh, mm, ss, ff = self.frames_to_tc(self.frames + 1, skip_rollover=True)
-        framerate = (
-            float(self.framerate) if self._ntsc_framerate else self._int_framerate
-        )
-        ms = ff / framerate
-        if as_float:
-            return hh * 3600 + mm * 60 + ss + ms
-        return f"{hh:02d}:{mm:02d}:{ss:02d}.{round(ms * 1000):03d}"
-
-    @overload
-    def to_realtime(self, as_float: Literal[True]) -> float:
-        pass
-
-    @overload
-    def to_realtime(self, as_float: Literal[False]) -> str:
-        pass
-
-    def to_realtime(self, as_float: bool = False) -> str | float:  # type:ignore
-        """Convert a Timecode to a "real time" timestamp.
-
-        Reference: SMPTE 12-1 §5.1.2
-
-        Args:
-            as_float (bool): Return the time as a float number of seconds.
-
-        Returns:
-            str: The "real time" timestamp of the Timecode.
-        """
-        # float property is in the video system time grid
-        ts_float = self.float
-
-        if self.ms_frame:
-            return ts_float - (1e-3) if as_float else str(self)
-
-        # "int_framerate" frames is one second in NTSC time
-        if self._ntsc_framerate:
-            ts_float *= 1.001
-        if as_float:
-            return ts_float
-
-        def f_fmt_divmod(x: tuple[int, float]) -> tuple[int, float]:
-            """Helper to format divmod results.
-
-            Args:
-                x (tuple): The divmod result.
-
-            Returns:
-                tuple[int, float]: Formatted divmod result.
-            """
-            return (int(x[0]), x[1])
-
-        hh, ts_float = f_fmt_divmod(divmod(ts_float, 3600))
-        mm, ts_float = f_fmt_divmod(divmod(ts_float, 60))
-        ss, ts_float = f_fmt_divmod(divmod(ts_float, 1))
-        ms = round(ts_float * 1000)
-
-        return f"{hh:02d}:{mm:02d}:{ss:02d}.{ms:03d}"
 
     @classmethod
     def parse_timecode(cls, timecode: int | str) -> tuple[int, int, int, int]:
@@ -534,7 +522,7 @@ class Timecode:
         return ":"
 
     def __iter__(self) -> Iterator[Self]:
-        """Yield and iterator.
+        """Yield an iterator.
 
         Yields:
             Timecode: Yields this Timecode instance.
@@ -550,6 +538,16 @@ class Timecode:
         """
         self.add_frames(1)
         return self
+
+    def set_fractional(self, state: bool) -> None:
+        """Set if the Timecode is to be represented with fractional seconds.
+
+        Args:
+            state (bool): If set to True the current Timecode instance will be
+                represented with a fractional seconds (will have a "." in the frame
+                separator).
+        """
+        self.fraction_frame = state
 
     def back(self) -> Self:
         """Subtract one frame from this Timecode to go back one frame.
@@ -595,6 +593,12 @@ class Timecode:
                 Timecode instance to.
         """
         self.frames = int(self.frames / frames)
+
+    def _copy_props_from(self, other: Timecode) -> None:
+        self.drop_frame = other.drop_frame
+        self.fraction_frame = other.fraction_frame
+        self.usec_timestamps = other.usec_timestamps
+        self.reference_time_on_display = other.reference_time_on_display
 
     def __eq__(self, other: int | str | Timecode | object) -> bool:
         """Override the equality operator.
@@ -729,7 +733,7 @@ class Timecode:
         """
         # duplicate current one
         tc = Timecode(self.framerate, frames=self.frames)
-        tc.drop_frame = self.drop_frame
+        tc._copy_props_from(self)
 
         if isinstance(other, Timecode):
             tc.add_frames(other.frames)
@@ -764,7 +768,7 @@ class Timecode:
                 f"Type {other.__class__.__name__} not supported for arithmetic."
             )
         tc = Timecode(self.framerate, frames=abs(subtracted_frames))
-        tc.drop_frame = self.drop_frame
+        tc._copy_props_from(self)
         return tc
 
     def __mul__(self, other: int | Timecode) -> Timecode:
@@ -789,7 +793,7 @@ class Timecode:
                 f"Type {other.__class__.__name__} not supported for arithmetic."
             )
         tc = Timecode(self.framerate, frames=multiplied_frames)
-        tc.drop_frame = self.drop_frame
+        tc._copy_props_from(self)
         return tc
 
     def __div__(self, other: int | Timecode) -> Timecode:
@@ -806,15 +810,16 @@ class Timecode:
             Timecode: The resultant Timecode instance.
         """
         if isinstance(other, Timecode):
-            div_frames = int(float(self.frames) / float(other.frames))
+            div_frames = int(self.frames / other.frames)
         elif isinstance(other, int):
-            div_frames = int(float(self.frames) / float(other))
+            div_frames = int(self.frames / other)
         else:
             raise TimecodeError(
                 f"Type {other.__class__.__name__} not supported for arithmetic."
             )
-
-        return Timecode(self.framerate, frames=div_frames)
+        tc = Timecode(self.framerate, frames=div_frames)
+        tc._copy_props_from(self)
+        return tc
 
     def __truediv__(self, other: int | Timecode) -> Timecode:
         """Return a new Timecode instance with divided value.
@@ -828,13 +833,32 @@ class Timecode:
         """
         return self.__div__(other)
 
+    def __float__(self) -> float:
+        """Convert this Timecode instance to a float representation (seconds).
+
+        Returns:
+            float: The float representation (seconds).
+        """
+        offset = int(self.reference_time_on_display)
+        seconds = float((self.frames - offset)/self._int_framerate)
+        return math.nextafter(seconds, math.inf)
+
+    def __str__(self) -> str:
+        """Return the actual Timecode as a string.
+
+        Returns:
+            str: The string of this Timecode.
+        """
+        return self.tc_to_string(*self.frames_to_tc(self.frames))
+        
     def __repr__(self) -> str:
         """Return the string representation of this Timecode instance.
 
         Returns:
             str: The string representation of this Timecode instance.
         """
-        return self.tc_to_string(*self.frames_to_tc(self.frames))
+        # use frames= as that is agnostic to drop_frame
+        return f"{__class__.__name__}('{self.framerate}', frames={self.frames})"
 
     @property
     def hrs(self) -> int:
@@ -885,6 +909,7 @@ class Timecode:
         """
         return self.frames - 1
 
+
     @property
     def float(self) -> float:
         """Return the seconds as float.
@@ -892,8 +917,35 @@ class Timecode:
         Returns:
             float: The seconds as float.
         """
-        return float(self.frames) / float(self._int_framerate)
+        return float(self)
+####
 
+#%%
+class TimecodeBuilder:
+    """Helper class to pre-configure instantiation of Timecodes.
+    
+    A list of kwargs of class Timecode can be provided to the builder, which
+    will be used when the builder instance is called to create new Timecodes.
+    
+    Args:
+        kwargs (dict): list of pre-configured arguments for the Timecodes
+        instantiated by calling this builder. Refer to Timecode docu.
+    """
 
+    def __init__(self, **kwargs) -> None:
+        self.kwargs = kwargs
+
+    def __call__(self, *args, **kwargs) -> Timecode:
+        """Create a Timecode combining the preconfigured and user arguments.
+        
+        Returns:
+            Timecode: timecode instance given the arguments.
+        """
+        kwargs = self.kwargs | kwargs
+        return Timecode(*args, **kwargs)
+####
+
+#%%
 class TimecodeError(Exception):
     """Raised when an error occurred in timecode calculation."""
+
