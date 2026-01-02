@@ -6,82 +6,18 @@ from __future__ import annotations
 import math
 import sys
 from fractions import Fraction
-from typing import TYPE_CHECKING, NewType
+from typing import TYPE_CHECKING
+
+from .helpers import _Framerate, _Timestamp
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
 if sys.version_info >= (3, 11):
     from typing import Self
-    _frate_type = Fraction | str | float | tuple[int, int]
 else:
     from typing_extensions import Self
-    from typing import Union
-    _frate_type = Union[Fraction, str, float, tuple[int, int]]
     
-_Framerate = NewType("_Framerate", _frate_type)
-
-#%%
-class _Timestamp:
-    def __init__(self, ts: Fraction, usec_precision: bool = False) -> None:
-        if ts < 0:
-            raise ValueError(f"Timestamp cannot be negative, got {ts}.")
-        self.usec_precision = usec_precision
-        self._exact_ts = ts
-        
-    def __float__(self) -> float:
-        """Convert this _Timestamp instance to a float (timestamp in seconds).
-        
-        Returns:
-            float: timestamp value in seconds of this instance
-        """
-        return float(self._exact_ts)    
-    
-    def total_seconds(self) -> float:
-        """Return the time in seconds of this Timestamp instance as a float.
-        
-        Returns:
-            float: timestamp value in seconds of this instance
-            
-        Truncation is possible, it's not an exact representation.
-        """
-        return float(self)
-    
-    def exact(self) -> Fraction:
-        """Return the time in seconds of this Timestamp instance as a fraction.
-        
-        Returns:
-            Fraction: exact timestamp value in seconds of this instance.
-        """
-        return self._exact_ts
-    
-    def __str__(self) -> str:
-        """Convert the _Timestamp instance to a timestamp string.
-        
-        Returns:
-            string: Timestamp string of this _Timestamp instance.
-        """
-        hh = int(self._exact_ts // 3600)
-        mm = int(self._exact_ts // 60) % 60
-        ss = int(self._exact_ts % 60)
-        decimal_part = (self._exact_ts - int(self._exact_ts))*1000
-        
-        if self.usec_precision:
-            s_decimal_part = f"{round(decimal_part*1000):>06}"
-        else:
-            s_decimal_part = f"{round(decimal_part):03}"
-        return f"{hh:02d}:{mm:02d}:{ss:02d}.{s_decimal_part}"
-
-    def __repr__(self) -> str:
-        """Represent a _Timestamp instance.
-        
-        Returns:
-            string: representation of this _Timestamp instance.
-        """
-        usec_part = f", usec_precision={self.usec_precision}" * self.usec_precision
-        return f"{__class__.__name__}({self._exact_ts}{usec_part})"
-####
-
 #%%
 class Timecode:
     """The main timecode class.

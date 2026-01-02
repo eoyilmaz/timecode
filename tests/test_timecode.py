@@ -1756,7 +1756,35 @@ def test_repr_parse():
     #force NDF to verify there is no mangling even with a DF framerate
     tc = Timecode('30000/1001', '12:34:56:21', force_non_drop_frame=True)
     tc_eval = eval(repr(tc))
-    
+
     assert tc.frames == tc_eval.frames
     assert tc.framerate == tc_eval.framerate
+
+def test_reference_time():
+    framerate = Fraction(120000, 1001)
+    #start_seconds is in the system timebase, so use int_fps
+    tc1 = Timecode(framerate, start_seconds=1/120)
+    tc2 = Timecode(framerate, start_seconds=0, reference_time_on_display=True)
+    assert tc1 == tc2
+
+def test_reference_time_frame_offset():
+    framerate = Fraction(120000, 1001)
+    #start_seconds is in the system timebase, so use int_fps
+    tc1 = Timecode(framerate, start_seconds=600)
+    tc2 = Timecode(framerate, start_seconds=600, reference_time_on_display=True)
+    assert (tc1 + 1) == tc2
+
+def test_reference_real_system_time_value():
+    framerate = Fraction(48000, 1001)
+    tc = Timecode(framerate, frames=1, reference_time_on_display=True)
+    assert tc.frames == 1
+    assert tc._is_ntsc_rate is True # needed for this test
     
+    # Time reference on system starting to draw the first frame.
+    # only time where both are equal.
+    assert float(tc.to_realtime()) == 0.0
+    assert float(tc.to_systemtime()) == 0.0
+    
+    tc.reference_time_on_display = False
+    # No longer true, NTSC is slower than wall-clock
+    assert 0 < tc.to_systemtime() < tc.to_realtime()
