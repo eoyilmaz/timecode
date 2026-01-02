@@ -3,9 +3,12 @@ import pytest
 
 from timecode import Timecode, TimecodeError
 
+import random
+
 
 @pytest.mark.parametrize(
-    "args,kwargs", [
+    "args,kwargs",
+    [
         [["12", "00:00:00:00"], {}],
         [["23.976", "00:00:00:00"], {}],
         [["23.98", "00:00:00:00"], {}],
@@ -88,7 +91,7 @@ from timecode import Timecode, TimecodeError
         [[60], {}],
         [[1000], {}],
         [[24], {"frames": 12000}],
-    ]
+    ],
 )
 def test_instance_creation(args, kwargs):
     """Instance creation, none of these should raise any error."""
@@ -105,7 +108,8 @@ def test_2398_vs_23976():
 
 
 @pytest.mark.parametrize(
-    "args,kwargs,expected_result,operator", [
+    "args,kwargs,expected_result,operator",
+    [
         [["24", "01:00:00:00"], {}, "01:00:00:00", True],
         [["23.98", "20:00:00:00"], {}, "20:00:00:00", True],
         [["29.97", "00:09:00;00"], {}, "00:08:59;28", True],
@@ -121,14 +125,19 @@ def test_2398_vs_23976():
         [["119.88", "00:00:20;00"], {}, "00:00:20;00", True],
         [["119.88", "00:00:20;00"], {}, "00:00:20:00", False],
         [["119.88", "01:30:45;100"], {}, "01:30:45;100", True],
-        [["119.88", "00:09:00:00"], {"force_non_drop_frame": True}, "00:09:00:00", True],
+        [
+            ["119.88", "00:09:00:00"],
+            {"force_non_drop_frame": True},
+            "00:09:00:00",
+            True,
+        ],
         [["ms", "00:00:00.900"], {}, "00:00:00.900", True],
         [["ms", "00:00:00.900"], {}, "00:00:00:900", False],
         [["24"], {"frames": 49}, "00:00:02:00", True],
         [["59.94", "00:09:00:00"], {"force_non_drop_frame": True}, "00:09:00:00", True],
         [["59.94", "04:20:13;21"], {}, "04:20:13;21", True],
         [["59.94"], {"frames": 935866}, "04:20:13;21", True],
-    ]
+    ],
 )
 def test_repr_overload(args, kwargs, expected_result, operator):
     """Several timecode initialization."""
@@ -147,7 +156,8 @@ def test_repr_overload_2():
 
 
 @pytest.mark.parametrize(
-    "args,kwargs,expected_repr,expected_frames,is_drop_frame", [
+    "args,kwargs,expected_repr,expected_frames,is_drop_frame",
+    [
         [["29.97"], {}, "00:00:00;00", 1, None],
         [["29.97"], {"force_non_drop_frame": True}, "00:00:00:00", 1, None],
         [["29.97", "00:00:00;01"], {"force_non_drop_frame": True}, None, 2, None],
@@ -173,9 +183,11 @@ def test_repr_overload_2():
         [["119.88"], {"frames": 1554744}, "03:36:09;23", None, True],
         [["23.98"], {"frames": 311280 * 720}, "01:59:59:23", None, None],
         [["23.98"], {"frames": 172800}, "01:59:59:23", None, None],
-    ]
+    ],
 )
-def test_timecode_str_repr_tests(args, kwargs, expected_repr, expected_frames, is_drop_frame):
+def test_timecode_str_repr_tests(
+    args, kwargs, expected_repr, expected_frames, is_drop_frame
+):
     """Several timecode initialization."""
     tc = Timecode(*args, **kwargs)
     if expected_repr is not None:
@@ -198,7 +210,8 @@ def test_start_seconds_argument_is_zero():
 
 
 @pytest.mark.parametrize(
-    "args,kwargs,hrs,mins,secs,frs,str_repr", [
+    "args,kwargs,hrs,mins,secs,frs,str_repr",
+    [
         [["ms", "03:36:09.230"], {}, 3, 36, 9, 230, None],
         [["29.97", "00:00:00;01"], {}, 0, 0, 0, 1, "00:00:00;01"],
         [["29.97", "03:36:09:23"], {}, 3, 36, 9, 23, None],
@@ -217,7 +230,7 @@ def test_start_seconds_argument_is_zero():
         [["24", "03:36:09:23"], {}, 3, 36, 9, 23, None],
         [["ms", "03:36:09.230"], {}, 3, 36, 9, 230, None],
         [["24"], {"frames": 12000}, 0, 8, 19, 23, "00:08:19:23"],
-    ]
+    ],
 )
 def test_timecode_properties_test(args, kwargs, hrs, mins, secs, frs, str_repr):
     """Test hrs, mins, secs and frs properties."""
@@ -231,7 +244,8 @@ def test_timecode_properties_test(args, kwargs, hrs, mins, secs, frs, str_repr):
 
 
 @pytest.mark.parametrize(
-    "args,kwargs,frames, str_repr, tc_next", [
+    "args,kwargs,frames, str_repr, tc_next",
+    [
         [["29.97", "00:00:00;00"], {}, 1, None, None],
         [["29.97", "00:00:00;21"], {}, 22, None, None],
         [["29.97", "00:00:00;29"], {}, 30, None, None],
@@ -240,8 +254,20 @@ def test_timecode_properties_test(args, kwargs, hrs, mins, secs, frs, str_repr):
         [["29.97", "00:00:10;00"], {}, 301, None, None],
         [["29.97", "00:01:00;00"], {}, 1799, "00:00:59;28", None],
         [["29.97", "23:59:59;29"], {}, 2589408, None, None],
-        [["29.97", "01:00:00;00"], {"force_non_drop_frame": True}, None, "01:00:00:00", None],
-        [["29.97", "01:00:00:00"], {"force_non_drop_frame": True}, None, "01:00:00:00", None],
+        [
+            ["29.97", "01:00:00;00"],
+            {"force_non_drop_frame": True},
+            None,
+            "01:00:00:00",
+            None,
+        ],
+        [
+            ["29.97", "01:00:00:00"],
+            {"force_non_drop_frame": True},
+            None,
+            "01:00:00:00",
+            None,
+        ],
         [["29.97", "13:36:59;29"], {}, None, None, "13:37:00;02"],
         [["59.94", "13:36:59;59"], {}, None, "13:36:59;59", None],
         [["59.94", "13:36:59;59"], {}, None, None, "13:37:00;04"],
@@ -258,11 +284,23 @@ def test_timecode_properties_test(args, kwargs, hrs, mins, secs, frs, str_repr):
         [["119.88", "00:00:01;00"], {}, 121, None, None],
         [["119.88", "00:01:00;00"], {}, 7193, "00:00:59;112", None],
         [["119.88", "23:59:59;119"], {}, 10357632, None, None],
-        [["119.88", "01:00:00;00"], {"force_non_drop_frame": True}, None, "01:00:00:00", None],
-        [["119.88", "01:00:00:00"], {"force_non_drop_frame": True}, None, "01:00:00:00", None],
+        [
+            ["119.88", "01:00:00;00"],
+            {"force_non_drop_frame": True},
+            None,
+            "01:00:00:00",
+            None,
+        ],
+        [
+            ["119.88", "01:00:00:00"],
+            {"force_non_drop_frame": True},
+            None,
+            "01:00:00:00",
+            None,
+        ],
         [["119.88", "13:36:59;119"], {}, None, None, "13:37:00;08"],
         [["119.88", "13:39:59;119"], {}, None, None, "13:40:00;00"],
-    ]
+    ],
 )
 def test_ntsc_drop_frame_conversion(args, kwargs, frames, str_repr, tc_next):
     """Test timecode to frame conversion for NTSC drop frame rates (29.97, 59.94, 119.88)."""
@@ -275,9 +313,7 @@ def test_ntsc_drop_frame_conversion(args, kwargs, frames, str_repr, tc_next):
         assert tc_next == tc.next().__str__()
 
 
-@pytest.mark.parametrize(
-    "framerate", ["29.97", "59.94", "89.91", "119.88"]
-)
+@pytest.mark.parametrize("framerate", ["29.97", "59.94", "89.91", "119.88"])
 def test_setting_ntsc_frame_rate_forces_drop_frame(framerate):
     """Setting NTSC drop frame rates forces the dropframe to True."""
     tc = Timecode(framerate)
@@ -304,7 +340,8 @@ def test_framerate_argument_is_frames():
 
 
 @pytest.mark.parametrize(
-    "args,kwargs,str_repr,next_range,last_tc_str_repr,frames", [
+    "args,kwargs,str_repr,next_range,last_tc_str_repr,frames",
+    [
         [["29.97", "03:36:09;23"], {}, "03:36:09;23", 60, "03:36:11;23", 388764],
         [["30", "03:36:09:23"], {}, "03:36:09;23", 60, "03:36:11:23", 389154],
         [["25", "03:36:09:23"], {}, "03:36:09;23", 60, "03:36:12:08", 324309],
@@ -320,7 +357,7 @@ def test_framerate_argument_is_frames():
         [["24", "03:36:09:23"], {}, "03:36:09:23", 60, "03:36:12:11", 311340],
         [["ms", "03:36:09.230"], {}, "03:36:09.230", 60, "03:36:09.290", 12969291],
         [["24"], {"frames": 12000}, "00:08:19:23", 60, "00:08:22:11", 12060],
-    ]
+    ],
 )
 def test_iteration(args, kwargs, str_repr, next_range, last_tc_str_repr, frames):
     """Test iteration."""
@@ -337,25 +374,202 @@ def test_iteration(args, kwargs, str_repr, next_range, last_tc_str_repr, frames)
 
 
 @pytest.mark.parametrize(
-    "args1,kwargs1,args2,kwargs2,custom_offset1,custom_offset2,str_repr1,str_repr2,frames1, frames2", [
-        [["29.97", "03:36:09;23"], {}, ["29.97", "00:00:29;23"], {},     894,  894, "03:36:39;17", "03:36:39;17", 389598, 389598],
-        [["30", "03:36:09:23"],    {}, ["30", "00:00:29:23"],    {},     894,  894, "03:36:39:17", "03:36:39:17", 389988, 389988],
-        [["25", "03:36:09:23"],    {}, ["25", "00:00:29:23"],    {},     749,  749, "03:36:39:22", "03:36:39:22", 324998, 324998],
-        [["59.94", "03:36:09;23"], {}, ["59.94", "00:00:29;23"], {},    1764, 1764, "03:36:38;47", "03:36:38;47", 779148, 779148],
-        [["60", "03:36:09:23"],    {}, ["60", "00:00:29:23"],    {},    1764, 1764, "03:36:38:47", "03:36:38:47", 779928, 779928],
-        [["59.94", "03:36:09;23"], {}, ["59.94", "00:00:29;23"], {},    1764, 1764, "03:36:38;47", "03:36:38;47", 779148, 779148],
-        [["72", "03:36:09:23"],    {}, ["72", "00:00:29:23"],    {},    2112, 2112, "03:36:38:47", "03:36:38:47", 935904, 935904],
-        [["96", "03:36:09:23"],    {}, ["96", "00:00:29:23"],    {},    2808, 2808, "03:36:38:47", "03:36:38:47", 1247856, 1247856],
-        [["100", "03:36:09:23"],   {}, ["100", "00:00:29:23"],   {},    2924, 2924, "03:36:38:47", "03:36:38:47", 1299848, 1299848],
-        [["120", "03:36:09:23"],   {}, ["120", "00:00:29:23"],   {},    3504, 3504, "03:36:38:47", "03:36:38:47", 1559808, 1559808],
-        [["119.88", "03:36:09;23"],{}, ["119.88", "00:00:29;23"],{},    3504, 3504, "03:36:38;47", "03:36:38;47", 1558248, 1558248],
-        [["23.98", "03:36:09:23"], {}, ["23.98", "00:00:29:23"], {},     720,  720, "03:36:39:23", "03:36:39:23", 312000, 312000],
-        [["ms", "03:36:09.230"],   {}, ["ms", "01:06:09.230"],   {}, 3969231,  720, "04:42:18.461", "03:36:09.950", 16938462, 12969951],
-        [["24"], {"frames": 12000}, ["24"], {"frames": 485}, 485, 719, "00:08:40:04", "00:08:49:22", 12485, 12719],
-        [["59.94", "04:20:13;21"], {}, ["59.94", "23:59:59;59"], {}, 5178816, 0, "04:20:13;21", "04:20:13;21", 6114682, 935866],
-    ]
+    "args1,kwargs1,args2,kwargs2,custom_offset1,custom_offset2,str_repr1,str_repr2,frames1, frames2",
+    [
+        [
+            ["29.97", "03:36:09;23"],
+            {},
+            ["29.97", "00:00:29;23"],
+            {},
+            894,
+            894,
+            "03:36:39;17",
+            "03:36:39;17",
+            389598,
+            389598,
+        ],
+        [
+            ["30", "03:36:09:23"],
+            {},
+            ["30", "00:00:29:23"],
+            {},
+            894,
+            894,
+            "03:36:39:17",
+            "03:36:39:17",
+            389988,
+            389988,
+        ],
+        [
+            ["25", "03:36:09:23"],
+            {},
+            ["25", "00:00:29:23"],
+            {},
+            749,
+            749,
+            "03:36:39:22",
+            "03:36:39:22",
+            324998,
+            324998,
+        ],
+        [
+            ["59.94", "03:36:09;23"],
+            {},
+            ["59.94", "00:00:29;23"],
+            {},
+            1764,
+            1764,
+            "03:36:38;47",
+            "03:36:38;47",
+            779148,
+            779148,
+        ],
+        [
+            ["60", "03:36:09:23"],
+            {},
+            ["60", "00:00:29:23"],
+            {},
+            1764,
+            1764,
+            "03:36:38:47",
+            "03:36:38:47",
+            779928,
+            779928,
+        ],
+        [
+            ["59.94", "03:36:09;23"],
+            {},
+            ["59.94", "00:00:29;23"],
+            {},
+            1764,
+            1764,
+            "03:36:38;47",
+            "03:36:38;47",
+            779148,
+            779148,
+        ],
+        [
+            ["72", "03:36:09:23"],
+            {},
+            ["72", "00:00:29:23"],
+            {},
+            2112,
+            2112,
+            "03:36:38:47",
+            "03:36:38:47",
+            935904,
+            935904,
+        ],
+        [
+            ["96", "03:36:09:23"],
+            {},
+            ["96", "00:00:29:23"],
+            {},
+            2808,
+            2808,
+            "03:36:38:47",
+            "03:36:38:47",
+            1247856,
+            1247856,
+        ],
+        [
+            ["100", "03:36:09:23"],
+            {},
+            ["100", "00:00:29:23"],
+            {},
+            2924,
+            2924,
+            "03:36:38:47",
+            "03:36:38:47",
+            1299848,
+            1299848,
+        ],
+        [
+            ["120", "03:36:09:23"],
+            {},
+            ["120", "00:00:29:23"],
+            {},
+            3504,
+            3504,
+            "03:36:38:47",
+            "03:36:38:47",
+            1559808,
+            1559808,
+        ],
+        [
+            ["119.88", "03:36:09;23"],
+            {},
+            ["119.88", "00:00:29;23"],
+            {},
+            3504,
+            3504,
+            "03:36:38;47",
+            "03:36:38;47",
+            1558248,
+            1558248,
+        ],
+        [
+            ["23.98", "03:36:09:23"],
+            {},
+            ["23.98", "00:00:29:23"],
+            {},
+            720,
+            720,
+            "03:36:39:23",
+            "03:36:39:23",
+            312000,
+            312000,
+        ],
+        [
+            ["ms", "03:36:09.230"],
+            {},
+            ["ms", "01:06:09.230"],
+            {},
+            3969231,
+            720,
+            "04:42:18.461",
+            "03:36:09.950",
+            16938462,
+            12969951,
+        ],
+        [
+            ["24"],
+            {"frames": 12000},
+            ["24"],
+            {"frames": 485},
+            485,
+            719,
+            "00:08:40:04",
+            "00:08:49:22",
+            12485,
+            12719,
+        ],
+        [
+            ["59.94", "04:20:13;21"],
+            {},
+            ["59.94", "23:59:59;59"],
+            {},
+            5178816,
+            0,
+            "04:20:13;21",
+            "04:20:13;21",
+            6114682,
+            935866,
+        ],
+    ],
 )
-def test_op_overloads_add(args1, kwargs1, args2, kwargs2, custom_offset1, custom_offset2, str_repr1, str_repr2, frames1, frames2):
+def test_op_overloads_add(
+    args1,
+    kwargs1,
+    args2,
+    kwargs2,
+    custom_offset1,
+    custom_offset2,
+    str_repr1,
+    str_repr2,
+    frames1,
+    frames2,
+):
     """Test + operator overload."""
     tc = Timecode(*args1, **kwargs1)
     tc2 = Timecode(*args2, **kwargs2)
@@ -369,25 +583,202 @@ def test_op_overloads_add(args1, kwargs1, args2, kwargs2, custom_offset1, custom
 
 
 @pytest.mark.parametrize(
-    "args1,kwargs1,args2,kwargs2,custom_offset1,custom_offset2,str_repr1,str_repr2,frames1, frames2", [
-        [["29.97", "03:36:09;23"], {}, ["29.97", "00:00:29;23"], {}, 894, 894, "03:35:39;27", "03:35:39;27", 387810, 387810],
-        [["30", "03:36:09:23"], {}, ["30", "00:00:29:23"], {}, 894,  894, "03:35:39:29", "03:35:39:29", 388200, 388200],
-        [["25", "03:36:09:23"], {}, ["25", "00:00:29:23"], {}, 749,  749, "03:35:39:24", "03:35:39:24", 323500, 323500],
-        [["59.94", "03:36:09;23"], {}, ["59.94", "00:00:29;23"], {}, 1764,  1764, "03:35:39;55", "03:35:39;55", 775620, 775620],
-        [["60", "03:36:09:23"], {}, ["60", "00:00:29:23"], {}, 1764,  1764, "03:35:39:59", "03:35:39:59", 776400, 776400],
-        [["59.94", "03:36:09;23"], {}, ["59.94", "00:00:29;23"], {}, 1764,  1764, "03:35:39;55", "03:35:39;55", 775620, 775620],
-        [["72", "03:36:09:23"], {}, ["72", "00:00:29:23"], {}, 2112, 2112, "03:35:39:71", "03:35:39:71", 931680, 931680],
-        [["96", "03:36:09:23"], {}, ["96", "00:00:29:23"], {}, 2808, 2808, "03:35:39:95", "03:35:39:95", 1242240, 1242240],
-        [["100", "03:36:09:23"], {}, ["100", "00:00:29:23"], {}, 2924, 2924, "03:35:39:99", "03:35:39:99", 1294000, 1294000],
-        [["120", "03:36:09:23"], {}, ["120", "00:00:29:23"], {}, 3504, 3504, "03:35:39:119", "03:35:39:119", 1552800, 1552800],
-        [["119.88", "03:36:09;23"], {}, ["119.88", "00:00:29;23"], {}, 3504, 3504, "03:35:39;111", "03:35:39;111", 1551240, 1551240],
-        [["23.98", "03:36:09:23"], {}, ["23.98", "00:00:29:23"], {}, 720,  720, "03:35:39:23", "03:35:39:23", 310560, 310560],
-        [["23.98", "03:36:09:23"], {}, ["23.98", "00:00:29:23"], {}, 720,  720, "03:35:39:23", "03:35:39:23", 310560, 310560],
-        [["ms", "03:36:09.230"], {}, ["ms", "01:06:09.230"], {}, 3969231,  3969231, "02:29:59.999", "02:29:59.999", 9000000, 9000000],
-        [["24"], {"frames": 12000}, ["24"], {"frames": 485}, 485,  485, "00:07:59:18", "00:07:59:18", 11515, 11515],
-    ]
+    "args1,kwargs1,args2,kwargs2,custom_offset1,custom_offset2,str_repr1,str_repr2,frames1, frames2",
+    [
+        [
+            ["29.97", "03:36:09;23"],
+            {},
+            ["29.97", "00:00:29;23"],
+            {},
+            894,
+            894,
+            "03:35:39;27",
+            "03:35:39;27",
+            387810,
+            387810,
+        ],
+        [
+            ["30", "03:36:09:23"],
+            {},
+            ["30", "00:00:29:23"],
+            {},
+            894,
+            894,
+            "03:35:39:29",
+            "03:35:39:29",
+            388200,
+            388200,
+        ],
+        [
+            ["25", "03:36:09:23"],
+            {},
+            ["25", "00:00:29:23"],
+            {},
+            749,
+            749,
+            "03:35:39:24",
+            "03:35:39:24",
+            323500,
+            323500,
+        ],
+        [
+            ["59.94", "03:36:09;23"],
+            {},
+            ["59.94", "00:00:29;23"],
+            {},
+            1764,
+            1764,
+            "03:35:39;55",
+            "03:35:39;55",
+            775620,
+            775620,
+        ],
+        [
+            ["60", "03:36:09:23"],
+            {},
+            ["60", "00:00:29:23"],
+            {},
+            1764,
+            1764,
+            "03:35:39:59",
+            "03:35:39:59",
+            776400,
+            776400,
+        ],
+        [
+            ["59.94", "03:36:09;23"],
+            {},
+            ["59.94", "00:00:29;23"],
+            {},
+            1764,
+            1764,
+            "03:35:39;55",
+            "03:35:39;55",
+            775620,
+            775620,
+        ],
+        [
+            ["72", "03:36:09:23"],
+            {},
+            ["72", "00:00:29:23"],
+            {},
+            2112,
+            2112,
+            "03:35:39:71",
+            "03:35:39:71",
+            931680,
+            931680,
+        ],
+        [
+            ["96", "03:36:09:23"],
+            {},
+            ["96", "00:00:29:23"],
+            {},
+            2808,
+            2808,
+            "03:35:39:95",
+            "03:35:39:95",
+            1242240,
+            1242240,
+        ],
+        [
+            ["100", "03:36:09:23"],
+            {},
+            ["100", "00:00:29:23"],
+            {},
+            2924,
+            2924,
+            "03:35:39:99",
+            "03:35:39:99",
+            1294000,
+            1294000,
+        ],
+        [
+            ["120", "03:36:09:23"],
+            {},
+            ["120", "00:00:29:23"],
+            {},
+            3504,
+            3504,
+            "03:35:39:119",
+            "03:35:39:119",
+            1552800,
+            1552800,
+        ],
+        [
+            ["119.88", "03:36:09;23"],
+            {},
+            ["119.88", "00:00:29;23"],
+            {},
+            3504,
+            3504,
+            "03:35:39;111",
+            "03:35:39;111",
+            1551240,
+            1551240,
+        ],
+        [
+            ["23.98", "03:36:09:23"],
+            {},
+            ["23.98", "00:00:29:23"],
+            {},
+            720,
+            720,
+            "03:35:39:23",
+            "03:35:39:23",
+            310560,
+            310560,
+        ],
+        [
+            ["23.98", "03:36:09:23"],
+            {},
+            ["23.98", "00:00:29:23"],
+            {},
+            720,
+            720,
+            "03:35:39:23",
+            "03:35:39:23",
+            310560,
+            310560,
+        ],
+        [
+            ["ms", "03:36:09.230"],
+            {},
+            ["ms", "01:06:09.230"],
+            {},
+            3969231,
+            3969231,
+            "02:29:59.999",
+            "02:29:59.999",
+            9000000,
+            9000000,
+        ],
+        [
+            ["24"],
+            {"frames": 12000},
+            ["24"],
+            {"frames": 485},
+            485,
+            485,
+            "00:07:59:18",
+            "00:07:59:18",
+            11515,
+            11515,
+        ],
+    ],
 )
-def test_op_overloads_subtract(args1, kwargs1, args2, kwargs2, custom_offset1, custom_offset2, str_repr1, str_repr2, frames1, frames2):
+def test_op_overloads_subtract(
+    args1,
+    kwargs1,
+    args2,
+    kwargs2,
+    custom_offset1,
+    custom_offset2,
+    str_repr1,
+    str_repr2,
+    frames1,
+    frames2,
+):
     """Test - operator overload."""
     tc = Timecode(*args1, **kwargs1)
     tc2 = Timecode(*args2, **kwargs2)
@@ -401,23 +792,178 @@ def test_op_overloads_subtract(args1, kwargs1, args2, kwargs2, custom_offset1, c
 
 
 @pytest.mark.parametrize(
-    "args1,kwargs1,args2,kwargs2,custom_offset1,custom_offset2,str_repr1,str_repr2,frames1, frames2", [
-        [["29.97", "00:00:09;23"], {}, ["29.97", "00:00:29;23"], {}, 894,  4, "02:26:09;29", "00:00:39;05", 262836, 1176],
-        [["30", "03:36:09:23"], {}, ["30", "00:00:29:23"], {}, 894,  894, "04:50:01:05", "04:50:01:05", 347850036, 347850036],
-        [["25", "03:36:09:23"], {}, ["25", "00:00:29:23"], {}, 749,  749, "10:28:20:00", "10:28:20:00", 242862501, 242862501],
-        [["59.94", "03:36:09;23"], {}, ["59.94", "00:00:29;23"], {}, 1764,  1764, "18:59:27;35", "18:59:27;35", 1371305376, 1371305376],
-        [["60", "03:36:09:23"], {}, ["60", "00:00:29:23"], {}, 1764,  1764, "19:00:21:35", "19:00:21:35", 1372681296, 1372681296],
-        [["59.94", "03:36:09;23"], {}, ["59.94", "00:00:29;23"], {}, 1764,  1764, "18:59:27;35", "18:59:27;35", 1371305376, 1371305376],
-        [["72", "03:36:09:23"], {}, ["72", "00:00:29:23"], {}, 2112, 2112, "00:40:31:71", "00:40:31:71", 1972168704, 1972168704],
-        [["96", "03:36:09:23"], {}, ["96", "00:00:29:23"], {}, 2808, 2808, "12:00:53:95", "12:00:53:95", 3496094784, 3496094784],
-        [["100", "03:36:09:23"], {}, ["100", "00:00:29:23"], {}, 2924, 2924, "21:54:17:75", "21:54:17:75", 3792205776, 3792205776],
-        [["120", "03:36:09:23"], {}, ["120", "00:00:29:23"], {}, 3504, 3504, "23:21:16:95", "23:21:16:95", 5453289216, 5453289216],
-        [["119.88", "03:36:09;23"], {}, ["119.88", "00:00:29;23"], {}, 3504, 3504, "23:19:28;95", "23:19:28;95", 5447822976, 5447822976],
-        [["ms", "03:36:09.230"], {}, ["ms", "01:06:09.230"], {}, 3969231,  3969231, "17:22:11.360", "17:22:11.360", 51477873731361, 51477873731361],
-        [["24"], {"frames": 12000}, ["24"], {"frames": 485}, 485,  485, "19:21:39:23", "19:21:39:23", 5820000, 5820000],
-    ]
+    "args1,kwargs1,args2,kwargs2,custom_offset1,custom_offset2,str_repr1,str_repr2,frames1, frames2",
+    [
+        [
+            ["29.97", "00:00:09;23"],
+            {},
+            ["29.97", "00:00:29;23"],
+            {},
+            894,
+            4,
+            "02:26:09;29",
+            "00:00:39;05",
+            262836,
+            1176,
+        ],
+        [
+            ["30", "03:36:09:23"],
+            {},
+            ["30", "00:00:29:23"],
+            {},
+            894,
+            894,
+            "04:50:01:05",
+            "04:50:01:05",
+            347850036,
+            347850036,
+        ],
+        [
+            ["25", "03:36:09:23"],
+            {},
+            ["25", "00:00:29:23"],
+            {},
+            749,
+            749,
+            "10:28:20:00",
+            "10:28:20:00",
+            242862501,
+            242862501,
+        ],
+        [
+            ["59.94", "03:36:09;23"],
+            {},
+            ["59.94", "00:00:29;23"],
+            {},
+            1764,
+            1764,
+            "18:59:27;35",
+            "18:59:27;35",
+            1371305376,
+            1371305376,
+        ],
+        [
+            ["60", "03:36:09:23"],
+            {},
+            ["60", "00:00:29:23"],
+            {},
+            1764,
+            1764,
+            "19:00:21:35",
+            "19:00:21:35",
+            1372681296,
+            1372681296,
+        ],
+        [
+            ["59.94", "03:36:09;23"],
+            {},
+            ["59.94", "00:00:29;23"],
+            {},
+            1764,
+            1764,
+            "18:59:27;35",
+            "18:59:27;35",
+            1371305376,
+            1371305376,
+        ],
+        [
+            ["72", "03:36:09:23"],
+            {},
+            ["72", "00:00:29:23"],
+            {},
+            2112,
+            2112,
+            "00:40:31:71",
+            "00:40:31:71",
+            1972168704,
+            1972168704,
+        ],
+        [
+            ["96", "03:36:09:23"],
+            {},
+            ["96", "00:00:29:23"],
+            {},
+            2808,
+            2808,
+            "12:00:53:95",
+            "12:00:53:95",
+            3496094784,
+            3496094784,
+        ],
+        [
+            ["100", "03:36:09:23"],
+            {},
+            ["100", "00:00:29:23"],
+            {},
+            2924,
+            2924,
+            "21:54:17:75",
+            "21:54:17:75",
+            3792205776,
+            3792205776,
+        ],
+        [
+            ["120", "03:36:09:23"],
+            {},
+            ["120", "00:00:29:23"],
+            {},
+            3504,
+            3504,
+            "23:21:16:95",
+            "23:21:16:95",
+            5453289216,
+            5453289216,
+        ],
+        [
+            ["119.88", "03:36:09;23"],
+            {},
+            ["119.88", "00:00:29;23"],
+            {},
+            3504,
+            3504,
+            "23:19:28;95",
+            "23:19:28;95",
+            5447822976,
+            5447822976,
+        ],
+        [
+            ["ms", "03:36:09.230"],
+            {},
+            ["ms", "01:06:09.230"],
+            {},
+            3969231,
+            3969231,
+            "17:22:11.360",
+            "17:22:11.360",
+            51477873731361,
+            51477873731361,
+        ],
+        [
+            ["24"],
+            {"frames": 12000},
+            ["24"],
+            {"frames": 485},
+            485,
+            485,
+            "19:21:39:23",
+            "19:21:39:23",
+            5820000,
+            5820000,
+        ],
+    ],
 )
-def test_op_overloads_mult(args1, kwargs1, args2, kwargs2, custom_offset1, custom_offset2, str_repr1, str_repr2, frames1, frames2):
+def test_op_overloads_mult(
+    args1,
+    kwargs1,
+    args2,
+    kwargs2,
+    custom_offset1,
+    custom_offset2,
+    str_repr1,
+    str_repr2,
+    frames1,
+    frames2,
+):
     """Test * operator overload."""
     tc = Timecode(*args1, **kwargs1)
     tc2 = Timecode(*args2, **kwargs2)
@@ -468,7 +1014,8 @@ def test_add_with_two_different_frame_rates():
 
 
 @pytest.mark.parametrize(
-    "args,kwargs,func,tc2", [
+    "args,kwargs,func,tc2",
+    [
         [["24", "00:00:01:00"], {}, lambda x, y: x + y, "not suitable"],
         [["24", "00:00:01:00"], {}, lambda x, y: x - y, "not suitable"],
         [["24", "00:00:01:00"], {}, lambda x, y: x / y, "not suitable"],
@@ -514,7 +1061,8 @@ def test_div_method_working_properly_2():
 
 
 @pytest.mark.parametrize(
-    "args,frames,frame_number", [
+    "args,frames,frame_number",
+    [
         [["24", "00:00:00:00"], 1, 0],
         [["24", "00:00:01:00"], 25, 24],
         [["29.97", "00:01:00;00"], 1799, 1798],
@@ -528,9 +1076,11 @@ def test_div_method_working_properly_2():
         [["100", "00:01:00:00"], 6001, 6000],
         [["120", "00:01:00:00"], 7201, 7200],
         [["119.88", "00:01:00;00"], 7193, 7192],
-    ]
+    ],
 )
-def test_frame_number_attribute_value_is_correctly_calculated(args, frames, frame_number):
+def test_frame_number_attribute_value_is_correctly_calculated(
+    args, frames, frame_number
+):
     """Timecode.frame_number attribute is correctly calculated."""
     tc1 = Timecode(*args)
     assert frames == tc1._frames
@@ -635,7 +1185,7 @@ def test_24_hour_limit_10():
 def test_24_hour_limit_11():
     """Timecode will loop back to 00:00:00:00 after 24 hours in 29.97 fps."""
     tc1 = Timecode("29.97", frames=467944)
-    tc2 = Timecode('29.97', '23:59:59;29')
+    tc2 = Timecode("29.97", "23:59:59;29")
     tc3 = tc1 + tc2
     assert "04:20:13;21" == tc3.__str__()
 
@@ -652,7 +1202,8 @@ def test_framerate_can_be_changed():
 
 
 @pytest.mark.parametrize(
-    "args,kwargs,frame_rate,int_framerate", [
+    "args,kwargs,frame_rate,int_framerate",
+    [
         [["24000/1000", "00:00:00:00"], {}, "24", 24],
         [["24000/1001", "00:00:00;00"], {}, "23.98", 24],
         [["30000/1000", "00:00:00:00"], {}, "30", 30],
@@ -670,7 +1221,7 @@ def test_framerate_can_be_changed():
         [["120000/1001", "00:00:00;00"], {}, "119.88", 120],
         [[(120000, 1000), "00:00:00:00"], {}, "120", 120],
         [[(120000, 1001), "00:00:00;00"], {}, "119.88", 120],
-    ]
+    ],
 )
 def test_rational_framerate_conversion(args, kwargs, frame_rate, int_framerate):
     """Fractional framerate conversion."""
@@ -732,51 +1283,52 @@ def test_toggle_fractional_frame_3():
 
 def test_timestamp_realtime_1():
     frames = 12345
-    ts = frames*1/24
-    assert Timecode(24, frames=frames).to_realtime(True) == ts
+    ts = frames * 1 / 24
+    realtime = Timecode(24, frames=frames).to_realtime(True)
+    assert abs(realtime - ts) < 1e-09
 
 
 def test_timestamp_realtime_2():
-    tc = Timecode(50, start_seconds=1/50)
-    assert tc.to_realtime() == '00:00:00.020'
+    tc = Timecode(50, start_seconds=1 / 50)
+    assert tc.to_realtime() == "00:00:00.020"
 
 
 def test_timestamp_realtime_3():
-    #SMPTE 12-1 §5.2.2:
-    #- "When DF compensation is applied to NTSC TC, the deviation after one hour is approximately –3.6 ms"
-    tc = Timecode(29.97, '00:59:59;29')
-    assert tc.to_realtime() == str(Timecode(1000, '01:00:00.000') - int(round(3.6)))
+    # SMPTE 12-1 §5.2.2:
+    # - "When DF compensation is applied to NTSC TC, the deviation after one hour is approximately –3.6 ms"
+    tc = Timecode(29.97, "00:59:59;29")
+    assert tc.to_realtime() == str(Timecode(1000, "01:00:00.000") - int(round(3.6)))
 
-    #- "[...] The deviation accumulated over a 24-hour period is approximately –2.6 frames (–86 ms)"
-    tc = Timecode(59.94, '23:59:59;59')
-    assert tc.to_realtime() == str(Timecode(1000, '24:00:00.000') - 86)
+    # - "[...] The deviation accumulated over a 24-hour period is approximately –2.6 frames (–86 ms)"
+    tc = Timecode(59.94, "23:59:59;59")
+    assert tc.to_realtime() == str(Timecode(1000, "24:00:00.000") - 86)
 
 
 def test_timestamp_realtime_4():
-    #SMPTE 12-1 §5.2.2
-    #- "Monotonically counting at int_framerate will yield a deviation of approx. +3.6 s in one hour of elapsed time."
-    tc = Timecode(59.94, '00:59:59:59', force_non_drop_frame=True)
-    assert tc.to_realtime() == str(Timecode(1000, '01:00:00.000') + 3600)
+    # SMPTE 12-1 §5.2.2
+    # - "Monotonically counting at int_framerate will yield a deviation of approx. +3.6 s in one hour of elapsed time."
+    tc = Timecode(59.94, "00:59:59:59", force_non_drop_frame=True)
+    assert tc.to_realtime() == str(Timecode(1000, "01:00:00.000") + 3600)
 
 
 def test_timestamp_systemtime_1():
     """
     TC with integer framerate always have system time equal to elapsed time.
     """
-    tc50 = Timecode(50, '00:59:59:49')
-    tc24 = Timecode(24, '00:59:59:23')
-    tcms = Timecode(1000, '01:00:00.000')
-    assert tc50.to_systemtime() == '01:00:00.000'
-    assert tc24.to_systemtime() == '01:00:00.000'
-    assert tcms.to_systemtime() == '01:00:00.000'
+    tc50 = Timecode(50, "00:59:59:49")
+    tc24 = Timecode(24, "00:59:59:23")
+    tcms = Timecode(1000, "01:00:00.000")
+    assert tc50.to_systemtime() == "01:00:00.000"
+    assert tc24.to_systemtime() == "01:00:00.000"
+    assert tcms.to_systemtime() == "01:00:00.000"
 
 
 def test_timestamp_systemtime_2():
     """
     TC with NTSC framerate always have system time different to realtime.
     """
-    tc = Timecode(23.98, '00:59:59:23')
-    assert tc.to_systemtime() == '01:00:00.000'
+    tc = Timecode(23.98, "00:59:59:23")
+    assert tc.to_systemtime() == "01:00:00.000"
     assert tc.to_systemtime() != tc.to_realtime()
 
 
@@ -785,10 +1337,10 @@ def test_timestamp_systemtime_3():
     TC with DF NTSC framerate have system time roughly equal to real time.
     with a -3.6 ms drift per hour (SMPTE 12-1 §5.2.2).
     """
-    tc = Timecode(29.97, '23:59:59;29')
-    assert tc.to_systemtime() == '24:00:00.000'
-    #Check if we have the expected drift at 24h
-    assert abs(tc.to_systemtime(True) - tc.to_realtime(True) - 24*3600e-6) < 1e-6
+    tc = Timecode(29.97, "23:59:59;29")
+    assert tc.to_systemtime() == "24:00:00.000"
+    # Check if we have the expected drift at 24h
+    assert abs(tc.to_systemtime(True) - tc.to_realtime(True) - 24 * 3600e-6) < 1e-6
 
 
 def test_add_const_dropframe_flag():
@@ -839,11 +1391,11 @@ def test_le_overload():
     tc4 = Timecode(24, "00:00:01.100")
     tc5 = Timecode(24, "00:00:01.200")
 
-    assert (tc1 == tc2)
-    assert (tc1 <= tc2)
-    assert (tc2 <= tc3)
+    assert tc1 == tc2
+    assert tc1 <= tc2
+    assert tc2 <= tc3
     assert not (tc2 >= tc3)
-    assert (tc5 >= tc4)
+    assert tc5 >= tc4
     assert tc5 > tc4
 
 
@@ -856,8 +1408,8 @@ def test_lt_overload():
 
     assert not (tc1 < tc2)
     assert not (tc2 < tc2)
-    assert (tc2 < tc3)
-    assert (tc4 < tc5)
+    assert tc2 < tc3
+    assert tc4 < tc5
 
 
 def test_parse_timecode_with_int():
@@ -871,7 +1423,10 @@ def test_frames_argument_is_not_an_int():
     with pytest.raises(TypeError) as cm:
         Timecode("30", frames=0.1223)
 
-    assert "Timecode.frames should be a positive integer bigger than zero, not a float" == str(cm.value)
+    assert (
+        "Timecode.frames should be a positive integer bigger than zero, not a float"
+        == str(cm.value)
+    )
 
 
 def test_frames_argument_is_zero():
@@ -879,7 +1434,10 @@ def test_frames_argument_is_zero():
     with pytest.raises(ValueError) as cm:
         Timecode("30", frames=0)
 
-    assert "Timecode.frames should be a positive integer bigger than zero, not 0" == str(cm.value)
+    assert (
+        "Timecode.frames should be a positive integer bigger than zero, not 0"
+        == str(cm.value)
+    )
 
 
 def test_bug_report_30():
@@ -938,7 +1496,7 @@ def test_bug_report_32():
     framerate = "30000/1001"
     seconds = 500
     tc1 = Timecode(framerate, start_seconds=seconds)
-    assert seconds == tc1.float
+    assert abs(tc1.float - seconds) < 1e-09
 
 
 def test_set_timecode_method():
@@ -1093,7 +1651,39 @@ def test_rollover_for_23_98():
 
 
 @pytest.mark.parametrize(
-    "args,kwargs,str_repr", [
+    "framerate",
+    ["23.976", "23.98", "24", "25", "29.97", "30", "50", "59.94", "60", "ms"],
+)
+def test_float_representation_roundtrip(framerate):
+    """Test float representation of Timecode."""
+    mismatched = 0
+    # Close enough to max frame across our supported framerates.
+    num_frames = Timecode(framerate, "24:00:00;00").frame_number
+    max_samples = 50_000
+
+    if num_frames <= max_samples:
+        frames_to_test = range(1, num_frames)
+    else:
+        # Not the most efficient sample allocation, but our range is pretty small.
+        random.seed(42)  # Fixed seed for repeatability
+        frames_to_test = sorted(random.sample(range(1, num_frames), max_samples))
+
+    for i in frames_to_test:
+        tc = Timecode(framerate, frames=i)
+        from_float = Timecode(framerate, start_seconds=tc.float)
+        if tc != from_float:
+            mismatched += 1
+
+    tested = len(frames_to_test)
+    assert mismatched == 0, (
+        f"{mismatched}/{tested} ({mismatched / tested * 100:.1f}%) incorrect "
+        f"(sampled {tested} of {num_frames} total frames)"
+    )
+
+
+@pytest.mark.parametrize(
+    "args,kwargs,str_repr",
+    [
         [["29.97"], {"frames": 2589408}, "23:59:59;29"],
         [["29.97"], {"frames": 2589409}, "00:00:00;00"],
         [["29.97"], {"frames": 2589409, "force_non_drop_frame": True}, "23:58:33:18"],
@@ -1114,7 +1704,7 @@ def test_rollover_for_23_98():
         [["120"], {"frames": 10368001}, "00:00:00:00"],
         [["119.88"], {"frames": 10357632}, "23:59:59;119"],
         [["119.88"], {"frames": 10357633}, "00:00:00;00"],
-    ]
+    ],
 )
 def test_rollover(args, kwargs, str_repr):
     tc = Timecode(*args, **kwargs)
@@ -1122,17 +1712,20 @@ def test_rollover(args, kwargs, str_repr):
 
 
 @pytest.mark.parametrize(
-    "framerate,int_framerate,is_drop,one_minute_frames,expected_tc", [
+    "framerate,int_framerate,is_drop,one_minute_frames,expected_tc",
+    [
         # Non-drop NTSC rates (multiples of 24000/1001)
-        ["47.952", 48, False, 2881, "00:01:00:00"],   # 2 * 23.976 fps - HFR broadcast
-        ["71.928", 72, False, 4321, "00:01:00:00"],   # 3 * 23.976 fps
-        ["95.904", 96, False, 5761, "00:01:00:00"],   # 4 * 23.976 fps
+        ["47.952", 48, False, 2881, "00:01:00:00"],  # 2 * 23.976 fps - HFR broadcast
+        ["71.928", 72, False, 4321, "00:01:00:00"],  # 3 * 23.976 fps
+        ["95.904", 96, False, 5761, "00:01:00:00"],  # 4 * 23.976 fps
         # Drop frame NTSC rate (multiple of 30000/1001)
         # For drop frame, test at 10-minute mark where frames aren't skipped
-        ["89.91", 90, True, 53947, "00:10:00;00"],    # 3 * 29.97 fps - with drop frame
-    ]
+        ["89.91", 90, True, 53947, "00:10:00;00"],  # 3 * 29.97 fps - with drop frame
+    ],
 )
-def test_generalized_ntsc_rates(framerate, int_framerate, is_drop, one_minute_frames, expected_tc):
+def test_generalized_ntsc_rates(
+    framerate, int_framerate, is_drop, one_minute_frames, expected_tc
+):
     """Test generalized NTSC detection for HFR rates.
 
     Tests automatic NTSC detection for rates based on multiples of 24000/1001 or 30000/1001.
@@ -1156,12 +1749,13 @@ def test_generalized_ntsc_rates(framerate, int_framerate, is_drop, one_minute_fr
 
 
 @pytest.mark.parametrize(
-    "rational_str,int_framerate,is_drop", [
-        ["48000/1001", 48, False],   # 47.952 fps
-        ["72000/1001", 72, False],   # 71.928 fps
-        ["90000/1001", 90, True],    # 89.91 fps - drop frame
-        ["96000/1001", 96, False],   # 95.904 fps
-    ]
+    "rational_str,int_framerate,is_drop",
+    [
+        ["48000/1001", 48, False],  # 47.952 fps
+        ["72000/1001", 72, False],  # 71.928 fps
+        ["90000/1001", 90, True],  # 89.91 fps - drop frame
+        ["96000/1001", 96, False],  # 95.904 fps
+    ],
 )
 def test_generalized_ntsc_rational_formats(rational_str, int_framerate, is_drop):
     """Test that rational format fractions work for new NTSC rates."""
