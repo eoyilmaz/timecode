@@ -13,10 +13,13 @@ if TYPE_CHECKING:
 
 if sys.version_info >= (3, 11):
     from typing import Self
+    _frate_type = Fraction | str | float | tuple[int, int]
 else:
     from typing_extensions import Self
-
-_Framerate = NewType("_Framerate", Fraction | str | float | tuple[int, int])
+    from typing import Union
+    _frate_type = Union[Fraction, str, float, tuple[int, int]]
+    
+_Framerate = NewType("_Framerate", _frate_type)
 
 #%%
 class _Timestamp:
