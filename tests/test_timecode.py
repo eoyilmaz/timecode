@@ -1017,21 +1017,31 @@ def test_add_with_two_different_frame_rates():
     [
         [["24", "00:00:01:00"], {}, lambda x, y: x + y, "not suitable"],
         [["24", "00:00:01:00"], {}, lambda x, y: x - y, "not suitable"],
-        [["24", "00:00:01:00"], {}, lambda x, y: x * y, "not suitable"],
         [["24", "00:00:01:00"], {}, lambda x, y: x / y, "not suitable"],
         [["24", "00:00:01:00"], {}, lambda x, y: x / y, 32.4],
-    ],
+        [["24", "00:00:01:00"], {}, lambda x, y: x * y, 32.4],
+    ]
 )
-def test_arithmetic_with_unsupported_type_raises_error(args, kwargs, func, tc2):
-    """TimecodeError is raised if the other class is not suitable for the operation."""
+def test_arithmetic_with_non_suitable_class_instance(args, kwargs, func, tc2):
+    """TypeError is raised if the other class is not suitable for the operation."""
     tc1 = Timecode(*args, **kwargs)
-    with pytest.raises(TimecodeError) as cm:
+    with pytest.raises(TypeError) as cm:
         _ = func(tc1, tc2)
 
-    assert str(cm.value) == "Type {} not supported for arithmetic.".format(
-        tc2.__class__.__name__
-    )
+    assert str(cm.value).startswith(f"unsupported operand type(s) for")
+    assert str(cm.value).endswith(f"'Timecode' and '{tc2.__class__.__name__}'")
 
+@pytest.mark.parametrize(
+    "args,kwargs,func,tc2", [
+        [["24", "00:00:01:00"], {}, lambda x, y: x * y, "not suitable"],
+    ]
+)
+def test_multiply_with_sequence_type(args, kwargs, func, tc2):
+    """TypeError is raised if the other class is not suitable for the operation."""
+    tc1 = Timecode(*args, **kwargs)
+    with pytest.raises(TypeError) as cm:
+        _ = func(tc1, tc2)
+    assert str(cm.value) == (f"can't multiply sequence by non-int of type 'Timecode'")
 
 def test_div_method_working_properly_1():
     """__div__ method is working properly."""
@@ -1247,12 +1257,6 @@ def test_ms_vs_fraction_frames_2():
 
 
 def test_ms_vs_fraction_frames_3():
-    tc1 = Timecode("ms", "00:00:00.040")
-    tc2 = Timecode(24, "00:00:00.042")
-    assert tc1 != tc2
-
-
-def test_ms_vs_fraction_frames_4():
     tc1 = Timecode("ms", "00:00:00.040")
     tc2 = Timecode(24, "00:00:00.042")
     assert tc1.frame_number == 40
@@ -1609,6 +1613,14 @@ def test_lt_method_with_integers():
     """__lt__ method with integers."""
     tc = Timecode("24", "00:00:10:00")
     assert tc < 250
+
+def test_comparison_with_different_framerates_raises():
+    """Comparing Timecodes with different framerates."""
+    tc1 = Timecode("24", "00:00:00:00")
+    tc2 = Timecode("30", "00:00:00:00")
+    with pytest.raises(ValueError) as cm:
+        _ = tc1 < tc2
+        _ = tc1 > tc2
 
 
 def test_fraction_lib_from_python3_raises_import_error_for_python2():
