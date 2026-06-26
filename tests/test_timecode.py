@@ -104,7 +104,7 @@ def test_2398_vs_23976():
     tc1 = Timecode("23.98", "04:01:45:23")
     tc2 = Timecode("23.976", "04:01:45:23")
     assert tc1._frames == tc2._frames
-    assert repr(tc1) == repr(tc2)
+    assert str(tc1) == str(tc2)
 
 
 @pytest.mark.parametrize(
@@ -143,9 +143,9 @@ def test_repr_overload(args, kwargs, expected_result, operator):
     """Several timecode initialization."""
     tc = Timecode(*args, **kwargs)
     if operator:
-        assert expected_result == tc.__repr__()
+        assert expected_result == tc.__str__()
     else:
-        assert expected_result != tc.__repr__()
+        assert expected_result != tc.__str__()
 
 
 def test_repr_overload_2():
@@ -1105,8 +1105,8 @@ def test_24_hour_limit_in_2997fps():
     assert tc2.drop_frame
     assert 2589408 == tc2._frames
 
-    assert "00:00:00;21" == tc1.__repr__()
-    assert "23:59:59;29" == tc2.__repr__()
+    assert "00:00:00;21" == str(tc1)
+    assert "23:59:59;29" == str(tc2)
 
     assert "00:00:00;21" == (tc1 + tc2).__str__()
     assert "02:00:00;00" == (tc2 + 215785).__str__()
@@ -1232,17 +1232,17 @@ def test_rational_framerate_conversion(args, kwargs, frame_rate, int_framerate):
 
 def test_rational_frame_delimiter_1():
     tc = Timecode("24000/1000", frames=1)
-    assert ";" not in tc.__repr__()
+    assert ";" not in tc.__str__()
 
 
 def test_rational_frame_delimiter_2():
     tc = Timecode("24000/1001", frames=1)
-    assert ";" not in tc.__repr__()
+    assert ";" not in tc.__str__()
 
 
 def test_rational_frame_delimiter_3():
     tc = Timecode("30000/1001", frames=1)
-    assert ";" in tc.__repr__()
+    assert ";" in tc.__str__()
 
 
 def test_ms_vs_fraction_frames_1():
@@ -1266,19 +1266,19 @@ def test_ms_vs_fraction_frames_3():
 
 def test_toggle_fractional_frame_1():
     tc = Timecode(24, 421729315)
-    assert tc.__repr__() == "19:23:14:23"
+    assert tc.__str__() == "19:23:14:23"
 
 
 def test_toggle_fractional_frame_2():
     tc = Timecode(24, 421729315)
     tc.set_fractional(True)
-    assert tc.__repr__() == "19:23:14.958"
+    assert tc.__str__() == "19:23:14.958"
 
 
 def test_toggle_fractional_frame_3():
     tc = Timecode(24, 421729315)
     tc.set_fractional(False)
-    assert tc.__repr__() == "19:23:14:23"
+    assert tc.__str__() == "19:23:14:23"
 
 
 def test_timestamp_realtime_1():
@@ -1455,7 +1455,7 @@ def test_bug_report_30():
     frame_idx = 50000
 
     tc1 = Timecode(framerate, frames=frame_idx)
-    assert "00:34:43:07" == tc1.__repr__()
+    assert "00:34:43:07" == tc1.__str__()
 
 
 def test_bug_report_31_part1():
@@ -1508,7 +1508,7 @@ def test_set_timecode_method():
     tc2 = Timecode("29.97", frames=1000)
     assert tc2.frames == 1000
 
-    tc1.set_timecode(tc2.__repr__())  # this is interpreted as 24
+    tc1.set_timecode(tc2.__str__())  # this is interpreted as 24
     assert tc1.frames == 802
 
     tc1.set_timecode(tc2)  # this should be interpreted as 29.97 and 1000 frames
@@ -1546,7 +1546,7 @@ def test_mult_frames_method_is_working_properly():
     tc = Timecode("24")
     tc.mult_frames(10)
     assert tc.frames == 10
-    assert tc.__repr__() == "00:00:00:09"
+    assert tc.__str__() == "00:00:00:09"
 
 
 def test_div_frames_method_is_working_properly():
@@ -1555,7 +1555,7 @@ def test_div_frames_method_is_working_properly():
     assert tc.frames == 10
     tc.div_frames(10)
     assert tc.frames == 1
-    assert tc.__repr__() == "00:00:00:00"
+    assert tc.__str__() == "00:00:00:00"
 
 
 def test_eq_method_with_integers():
@@ -1647,7 +1647,7 @@ def test_rollover_for_23_98():
     assert 2071849 == tc.frames
     tc.add_frames(24)
     assert 2071873 == tc.frames
-    assert "23:58:48:00" == tc.__repr__()
+    assert "23:58:48:00" == tc.__str__()
 
 
 @pytest.mark.parametrize(
@@ -1764,3 +1764,16 @@ def test_generalized_ntsc_rational_formats(rational_str, int_framerate, is_drop)
     assert tc._ntsc_framerate is True
     assert tc._int_framerate == int_framerate
     assert tc.drop_frame is is_drop
+
+
+def test_repr_parse():
+    for tc in [
+        Timecode('29.97', '12:34:56;21'),
+        Timecode('30000/1001', '12:34:56:21', force_non_drop_frame=True),
+        Timecode('24', '01:02:03:04'),
+    ]:
+        tc_eval = eval(repr(tc))
+        assert tc.frames == tc_eval.frames
+        assert tc.framerate == tc_eval.framerate
+        assert tc.drop_frame == tc_eval.drop_frame
+        assert str(tc) == str(tc_eval)

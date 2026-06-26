@@ -823,13 +823,22 @@ class Timecode:
         """
         return self.__div__(other)
 
+    def __str__(self) -> str:
+        """Return the actual Timecode as a string.
+
+        Returns:
+            str: The string of this Timecode.
+        """
+        return self.tc_to_string(*self.frames_to_tc(self.frames))
+
     def __repr__(self) -> str:
         """Return the string representation of this Timecode instance.
 
         Returns:
             str: The string representation of this Timecode instance.
         """
-        return self.tc_to_string(*self.frames_to_tc(self.frames))
+        extra = ", force_non_drop_frame=True" if self.force_non_drop_frame else ""
+        return f"{__class__.__name__}('{self.framerate}', frames={self.frames}{extra})"
 
     @property
     def hrs(self) -> int:
