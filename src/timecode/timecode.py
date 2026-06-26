@@ -422,10 +422,10 @@ class Timecode:
             return self.float - (1e-3) if as_float else str(self)
 
         hh, mm, ss, ff = self.frames_to_tc(self.frames + 1, skip_rollover=True)
-        framerate = (
-            float(self.framerate) if self._ntsc_framerate else self._int_framerate
-        )
-        ms = ff / framerate
+        # System time is in the integer frame grid, so always divide by _int_framerate.
+        # Using float(self.framerate) for NTSC rates gives wrong sub-second values
+        # because the stored string (e.g. "47.95") loses precision vs the true rate.
+        ms = ff / self._int_framerate
         if as_float:
             return hh * 3600 + mm * 60 + ss + ms
         return f"{hh:02d}:{mm:02d}:{ss:02d}.{round(ms * 1000):03d}"
