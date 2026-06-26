@@ -1764,3 +1764,18 @@ def test_generalized_ntsc_rational_formats(rational_str, int_framerate, is_drop)
     assert tc._ntsc_framerate is True
     assert tc._int_framerate == int_framerate
     assert tc.drop_frame is is_drop
+
+
+def test_systemtime_subframe_ntsc():
+    """to_systemtime uses integer framerate for sub-second calculation.
+
+    Non-standard NTSC rates (e.g. 48000/1001) are stored as a rounded float
+    string ("47.95"), so dividing by float(framerate) gives wrong milliseconds
+    for frames mid-second. The integer framerate (48) must be used instead.
+    """
+    from fractions import Fraction
+    # Frame 24 of 48000/1001 fps is exactly half a second in system time (24/48)
+    tc = Timecode(Fraction(48000, 1001), frames=24)
+    assert tc._ntsc_framerate is True
+    assert tc._int_framerate == 48
+    assert tc.to_systemtime() == "00:00:00.500"
