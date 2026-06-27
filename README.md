@@ -23,12 +23,13 @@ with an integer value or with a timecode is possible. Math operations between
 timecodes with different frame rates are supported. So:
 
 ```py
+from fractions import Fraction
 from timecode import Timecode
 
 tc1 = Timecode('29.97', '00:00:00;00')
 tc2 = Timecode(24, '00:00:00:10')
 tc3 = tc1 + tc2
-assert tc3.framerate == '29.97'
+assert tc3.framerate == Fraction(30000, 1001)
 assert tc3.frames == 12
 assert tc3 == '00:00:00:11'
 ```
@@ -60,8 +61,9 @@ are non drop frame.
 The timecode library supports fractional frame rates passed as a string:
 
 ```py
+from fractions import Fraction
 tc5 = Timecode('30000/1001', '00:00:00;00')
-assert tc5.framerate == '29.97'
+assert tc5.framerate == Fraction(30000, 1001)
 ```
 
 You may also pass a big "Binary Coded Decimal" integer as start timecode:
