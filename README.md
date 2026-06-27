@@ -68,7 +68,7 @@ You may also pass a big "Binary Coded Decimal" integer as start timecode:
 
 ```py
 tc6 = Timecode('24', 421729315)
-assert repr(tc6) == '19:23:14:23'
+assert str(tc6) == '19:23:14:23'
 ```
 
 This is useful for parsing timecodes stored in OpenEXR's and extracted through
@@ -86,10 +86,10 @@ You may set any timecode to be represented as fractions of seconds:
 
 ```py
 tc9 = Timecode(24, '19:23:14:23')
-assert repr(tc9) == '19:23:14:23'
+assert str(tc9) == '19:23:14:23'
 
 tc9.set_fractional(True)
-assert repr(tc9) == '19:23:14.958'
+assert str(tc9) == '19:23:14.958'
 ```
 
 Fraction of seconds is useful when working with tools like FFmpeg.
