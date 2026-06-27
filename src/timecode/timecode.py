@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import math
 from contextlib import suppress
+from fractions import Fraction
 from typing import TYPE_CHECKING, overload
 
 with suppress(ImportError):
@@ -14,11 +15,37 @@ with suppress(ImportError):
 if TYPE_CHECKING:
     import sys
     from collections.abc import Iterator
-    from fractions import Fraction
     if sys.version_info >= (3, 11):
         from typing import Self
     else:
         from typing_extensions import Self
+
+
+# Pre-computed table for common string framerate inputs. Avoids Fraction(str)
+# parsing and float conversion on every construction for the typical cases.
+# Each entry: (canonical_fraction, is_ntsc, int_framerate)
+_FRAMERATE_CACHE: dict[str, tuple[Fraction, bool, int]] = {
+    "23.976": (Fraction(24000, 1001),   True,  24),
+    "23.98":  (Fraction(24000, 1001),   True,  24),
+    "24":     (Fraction(24, 1),         False, 24),
+    "25":     (Fraction(25, 1),         False, 25),
+    "29.97":  (Fraction(30000, 1001),   True,  30),
+    "30":     (Fraction(30, 1),         False, 30),
+    "47.952": (Fraction(48000, 1001),   True,  48),
+    "48":     (Fraction(48, 1),         False, 48),
+    "50":     (Fraction(50, 1),         False, 50),
+    "59.94":  (Fraction(60000, 1001),   True,  60),
+    "60":     (Fraction(60, 1),         False, 60),
+    "71.928": (Fraction(72000, 1001),   True,  72),
+    "72":     (Fraction(72, 1),         False, 72),
+    "89.91":  (Fraction(90000, 1001),   True,  90),
+    "90":     (Fraction(90, 1),         False, 90),
+    "95.904": (Fraction(96000, 1001),   True,  96),
+    "96":     (Fraction(96, 1),         False, 96),
+    "100":    (Fraction(100, 1),        False, 100),
+    "119.88": (Fraction(120000, 1001),  True,  120),
+    "120":    (Fraction(120, 1),        False, 120),
+}
 
 
 class Timecode:
@@ -78,6 +105,24 @@ class Timecode:
         is_ntsc = abs(fps - expected_ntsc) < 0.005
 
         return is_ntsc, int_fps
+
+    @staticmethod
+    def _classify_fps(fps: Fraction) -> tuple[Fraction, bool, int]:
+        """Classify a Fraction framerate and return its canonical form.
+
+        Returns:
+            tuple: (canonical_fraction, is_ntsc, int_framerate)
+        """
+        if fps == 1000:
+            return fps, False, 1000
+        fps_float = float(fps)
+        if fps_float >= 2:
+            is_ntsc, int_fps = Timecode._is_ntsc_rate(fps_float)
+        else:
+            is_ntsc, int_fps = False, round(fps_float)
+        if is_ntsc:
+            return Fraction(int_fps * 1000, 1001), True, int_fps
+        return fps, False, round(fps_float)
 
     def __init__(
         self,
@@ -144,13 +189,13 @@ class Timecode:
         self._frames = frames
 
     @property
-    def framerate(self) -> str:
-        """Return the _framerate attribute.
+    def framerate(self) -> Fraction:
+        """Return the framerate as a Fraction.
 
         Returns:
-            str: The frame rate of this Timecode instance.
+            Fraction: The frame rate of this Timecode instance.
         """
-        return self._framerate  # type: ignore
+        return self._framerate
 
     @framerate.setter
     def framerate(self, framerate: float | str | tuple[int, int] | Fraction) -> None:
@@ -167,61 +212,33 @@ class Timecode:
                     "frames" will result a Timecode with 1 FPS.
                 tuple: The tuple should be in (nominator, denominator) format in which
                     the frame rate is kept as a fraction.
-                Fraction: If the current version of Python supports (which it should)
-                    then Fraction is also accepted.
+                Fraction: Also accepted directly.
         """
-        # Convert rational frame rate to float, defaults to None if not Fraction-like
-        numerator = getattr(framerate, "numerator", None)
-        denominator = getattr(framerate, "denominator", None)
-
-        try:
-            if "/" in framerate:  # type: ignore
-                numerator, denominator = framerate.split("/")  # type: ignore
-        except TypeError:
-            # not a string
-            pass
-
-        if isinstance(framerate, tuple):
-            numerator, denominator = framerate
-
-        if numerator and denominator:
-            framerate = round(float(numerator) / float(denominator), 2)
-            if framerate.is_integer():
-                framerate = int(framerate)
-
-        # check if number is passed and if so convert it to a string
-        if isinstance(framerate, (int, float)):
-            framerate = str(framerate)
-
-        self._ntsc_framerate = False
-
-        # Handle special cases first
-        if framerate in ["ms", "1000"]:
-            self._int_framerate = 1000
-            self.ms_frame = True
-            framerate = 1000
-        elif framerate == "frames":
-            self._int_framerate = 1
+        # Fast path: common string rates are pre-computed at module load.
+        if isinstance(framerate, str) and (cached := _FRAMERATE_CACHE.get(framerate)):
+            new_fps, is_ntsc, int_fps = cached
         else:
-            # Try to detect NTSC rates
-            try:
-                fps = float(framerate)  # type: ignore
-                is_ntsc, int_fps = self._is_ntsc_rate(fps)
+            if isinstance(framerate, str):
+                if framerate in ("ms", "1000"):
+                    framerate = 1000
+                elif framerate == "frames":
+                    framerate = 1
+            if isinstance(framerate, tuple):
+                raw = Fraction(*map(int, framerate))
+            else:
+                raw = Fraction(framerate)
+            if raw <= 0:
+                raise ValueError(f"Frame rate must be positive, got {framerate!r}")
+            new_fps, is_ntsc, int_fps = self._classify_fps(raw)
 
-                if is_ntsc:
-                    self._ntsc_framerate = True
-                    self._int_framerate = int_fps
-                    # DF only for multiples of 30000/1001 (29.97, 59.94, etc.).
-                    if int_fps % 30 == 0:
-                        self.drop_frame = not self.force_non_drop_frame
-                else:
-                    # Non-NTSC rate, use integer value
-                    self._int_framerate = int(fps)
-            except (ValueError, TypeError):
-                # If conversion fails, fall back to direct integer conversion
-                self._int_framerate = int(float(framerate))  # type: ignore
-
-        self._framerate = framerate  # type: ignore
+        self._framerate = new_fps
+        self._ntsc_framerate = is_ntsc
+        self._int_framerate = int_fps
+        self.ms_frame = (new_fps == 1000)
+        if is_ntsc and int_fps % 30 == 0:
+            self.drop_frame = not self.force_non_drop_frame
+        else:
+            self.drop_frame = False
 
     def set_fractional(self, state: bool) -> None:
         """Set if the Timecode is to be represented with fractional seconds.
@@ -277,11 +294,7 @@ class Timecode:
             if self.drop_frame:
                 timecode = ";".join(timecode.rsplit(":", 1))
 
-        ffps = (
-            float(self.framerate)
-            if self.framerate != "frames"
-            else float(self._int_framerate)
-        )
+        ffps = float(self._framerate)
 
         # Number of drop frames is 6% of framerate rounded to nearest integer
         drop_frames = round(ffps * 0.066666) if self.drop_frame else 0
@@ -329,23 +342,26 @@ class Timecode:
             tuple: A tuple containing the hours, minutes, seconds and frames
         """
         if self.drop_frame:
-            # Number of frames to drop on the minute marks is the nearest
-            # integer to 6% of the framerate
-            ffps = float(self.framerate)
-            drop_frames = round(ffps * 0.066666)
-        else:
-            ffps = float(self._int_framerate)
+            # Drop frame only applies to multiples of 30000/1001; each 30fps
+            # unit drops 2 frames per minute.
+            drop_frames = self._int_framerate * 2 // 30
+            frames_per_minute = self._int_framerate * 60 - drop_frames
+            frames_per_10_minutes = self._int_framerate * 600 - drop_frames * 9
+        elif self._ntsc_framerate:
+            # Forced NDF on an NTSC rate: keep _int_framerate grid (30, 60, ...)
             drop_frames = 0
+            frames_per_minute = self._int_framerate * 60
+            frames_per_10_minutes = self._int_framerate * 600
+        else:
+            # Standard or custom rate: use the stored Fraction directly so that
+            # non-integer rates (e.g. Fraction(47, 2)) get correct period lengths.
+            drop_frames = 0
+            frames_per_minute = round(self._framerate * 60)
+            frames_per_10_minutes = round(self._framerate * 600)
 
-        # Number of frames per ten minutes
-        frames_per_10_minutes = round(ffps * 60 * 10)
-
-        # Number of frames in a day - timecode rolls over after 24 hours
-        frames_per_24_hours = round(ffps * 60 * 60 * 24)
-
-        # Number of frames per minute is the round of the framerate * 60 minus
-        # the number of dropped frames
-        frames_per_minute = int(round(ffps) * 60) - drop_frames
+        # Number of frames in a day - timecode rolls over after 24 hours.
+        # For drop frame, derived from frames_per_10_minutes to stay exact.
+        frames_per_24_hours = frames_per_10_minutes * 144
 
         frame_number = frames - 1
 
@@ -422,10 +438,7 @@ class Timecode:
             return self.float - (1e-3) if as_float else str(self)
 
         hh, mm, ss, ff = self.frames_to_tc(self.frames + 1, skip_rollover=True)
-        framerate = (
-            float(self.framerate) if self._ntsc_framerate else self._int_framerate
-        )
-        ms = ff / framerate
+        ms = ff / self._int_framerate
         if as_float:
             return hh * 3600 + mm * 60 + ss + ms
         return f"{hh:02d}:{mm:02d}:{ss:02d}.{round(ms * 1000):03d}"

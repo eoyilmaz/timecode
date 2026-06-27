@@ -1,4 +1,6 @@
 #!-*- coding: utf-8 -*-
+from fractions import Fraction
+
 import pytest
 
 from timecode import Timecode, TimecodeError
@@ -335,7 +337,7 @@ def test_setting_framerate_to_1000_enables_ms_frame():
 def test_framerate_argument_is_frames():
     """Setting the framerate arg to 'frames' will set the integer frame rate to 1."""
     tc = Timecode("frames")
-    assert tc.framerate == "frames"
+    assert tc.framerate == 1
     assert tc._int_framerate == 1
 
 
@@ -981,7 +983,7 @@ def test_op_overloads_mult_1():
     tc1 = Timecode("23.98", "03:36:09:23")
     tc2 = Timecode("23.98", "00:00:29:23")
     tc3 = tc1 * tc2
-    assert tc3.framerate == "23.98"
+    assert tc3.framerate == Fraction(24000, 1001)
 
 
 def test_op_overloads_mult_2():
@@ -1008,7 +1010,7 @@ def test_add_with_two_different_frame_rates():
     tc1 = Timecode("29.97", "00:00:00;00")
     tc2 = Timecode("24", "00:00:00:10")
     tc3 = tc1 + tc2
-    assert "29.97" == tc3.framerate
+    assert Fraction(30000, 1001) == tc3.framerate
     assert 12 == tc3._frames
     assert tc3 == "00:00:00;11"
 
@@ -1204,23 +1206,23 @@ def test_framerate_can_be_changed():
 @pytest.mark.parametrize(
     "args,kwargs,frame_rate,int_framerate",
     [
-        [["24000/1000", "00:00:00:00"], {}, "24", 24],
-        [["24000/1001", "00:00:00;00"], {}, "23.98", 24],
-        [["30000/1000", "00:00:00:00"], {}, "30", 30],
-        [["30000/1001", "00:00:00;00"], {}, "29.97", 30],
-        [["60000/1000", "00:00:00:00"], {}, "60", 60],
-        [["60000/1001", "00:00:00;00"], {}, "59.94", 60],
-        [[(60000, 1001), "00:00:00;00"], {}, "59.94", 60],
-        [["72000/1000", "00:00:00:00"], {}, "72", 72],
-        [[(72000, 1000), "00:00:00:00"], {}, "72", 72],
-        [["96000/1000", "00:00:00:00"], {}, "96", 96],
-        [[(96000, 1000), "00:00:00:00"], {}, "96", 96],
-        [["100000/1000", "00:00:00:00"], {}, "100", 100],
-        [[(100000, 1000), "00:00:00:00"], {}, "100", 100],
-        [["120000/1000", "00:00:00:00"], {}, "120", 120],
-        [["120000/1001", "00:00:00;00"], {}, "119.88", 120],
-        [[(120000, 1000), "00:00:00:00"], {}, "120", 120],
-        [[(120000, 1001), "00:00:00;00"], {}, "119.88", 120],
+        [["24000/1000", "00:00:00:00"], {}, Fraction(24, 1), 24],
+        [["24000/1001", "00:00:00;00"], {}, Fraction(24000, 1001), 24],
+        [["30000/1000", "00:00:00:00"], {}, Fraction(30, 1), 30],
+        [["30000/1001", "00:00:00;00"], {}, Fraction(30000, 1001), 30],
+        [["60000/1000", "00:00:00:00"], {}, Fraction(60, 1), 60],
+        [["60000/1001", "00:00:00;00"], {}, Fraction(60000, 1001), 60],
+        [[(60000, 1001), "00:00:00;00"], {}, Fraction(60000, 1001), 60],
+        [["72000/1000", "00:00:00:00"], {}, Fraction(72, 1), 72],
+        [[(72000, 1000), "00:00:00:00"], {}, Fraction(72, 1), 72],
+        [["96000/1000", "00:00:00:00"], {}, Fraction(96, 1), 96],
+        [[(96000, 1000), "00:00:00:00"], {}, Fraction(96, 1), 96],
+        [["100000/1000", "00:00:00:00"], {}, Fraction(100, 1), 100],
+        [[(100000, 1000), "00:00:00:00"], {}, Fraction(100, 1), 100],
+        [["120000/1000", "00:00:00:00"], {}, Fraction(120, 1), 120],
+        [["120000/1001", "00:00:00;00"], {}, Fraction(120000, 1001), 120],
+        [[(120000, 1000), "00:00:00:00"], {}, Fraction(120, 1), 120],
+        [[(120000, 1001), "00:00:00;00"], {}, Fraction(120000, 1001), 120],
     ],
 )
 def test_rational_framerate_conversion(args, kwargs, frame_rate, int_framerate):
@@ -1737,7 +1739,7 @@ def test_generalized_ntsc_rates(
     assert tc._ntsc_framerate is True
     assert tc._int_framerate == int_framerate
     assert tc.drop_frame is is_drop
-    assert tc.framerate == framerate
+    assert tc.framerate == Fraction(int_framerate * 1000, 1001)
 
     # Test frame counting - one second should be int_framerate + 1
     tc2 = Timecode(framerate, f"00:00:01{separator}00")
